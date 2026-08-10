@@ -8,5 +8,6 @@ dependencies = [
     "flake8>=7.3.0",
     "mypy>=2.3.0",
     "pygame>=2.6.1",
+    "pyxel>=2.9.5",
     "rich>=15.0.0",
 ]

@@ -16,4 +16,3 @@ clean:
 lint:
 	uv run flake8 .
 	uv run mypy .
-
