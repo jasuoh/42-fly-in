@@ -7,6 +7,12 @@ from typing import Dict, Any, List
 from pydantic import BaseModel, Field, model_validator
 from enum import Enum
 
+class Config(BaseModel):
+    nb_drones: int
+    start: Zone
+    end: Zone
+    different_zones: List[Zone]
+
 
 class zone_types(Enum):
     normal = 'normal'
@@ -28,7 +34,7 @@ class InputParsingError(Exception):
     """
 
 
-def input_parsing() -> Dict[Any, Any]:
+def input_parsing_and_error_handling() -> Dict[Any, Any]:
     allowed_keys = ["nb_drones","start_hub", "end_hub", "hub", "connection"]
     argument_parser = argparse.ArgumentParser(description="CLI for Fly-In")
     argument_parser.add_argument("--input_map", default="maps/easy/01_linear_path.txt", dest="maps")
@@ -54,10 +60,17 @@ def input_parsing() -> Dict[Any, Any]:
 
 
 def assign_dict_to_obj(input_dict: Dict[Any, Any]) -> List[Zone]:
-    ...
+    config = Config()
+    try:
+        for index, key, value in enumerate(input_dict):
+            print(index, key, value)
+    except Exception as e:
+        print(e)
+    return config
 
 def main() -> None:
-    print("Hello, World!")
+    dictus = input_parsing_and_error_handling()
+    print(assign_dict_to_obj(dictus))
 
 
 if __name__ == "__main__":
