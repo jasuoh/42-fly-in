@@ -8,9 +8,10 @@ import sys
 
 
 class Connection(BaseModel):
-    Zone_a: str = None
-    Zone_b: str = None
-
+    zone_a: str = Field(...)
+    zone_b: str = Field(...)
+    max_link_capacity: int = Field(default=None, ge=0)
+    color: str = Field(default=None)
 
 class Config(BaseModel):
     nb_drones: int = None
@@ -85,7 +86,7 @@ def assign_dict_to_obj(input_dict: Dict[Any, Any]):
             metadata_dict["name"] = zone[0]
             metadata_dict["coordinates"] = (zone[1], zone[2])
         except Exception:
-            raise InputParsingError('Invalid Name')
+            raise InputParsingError('Invalid Name or coordinates')
         for i in range(3, len(zone)):
             try:
                 key, value = zone[i].split('=')
@@ -102,17 +103,20 @@ def assign_dict_to_obj(input_dict: Dict[Any, Any]):
         metadata_dict = {}
         try:
             connection = connection.split(" ")
-            metadata_dict['name'] = zone[1]
-            metadata_dict['coordinates'] = (zone[1], zone[2])
+            if connection.count('-') > 1:
+                raise InputParsingError(f"Invalid connection syntax for {connection}")
+            connection_path = connection[0].split('-')
+            metadata_dict['zone_a'] = connection_path[0]
+            metadata_dict['zone_b'] = connection_path[1]
         except Exception:
-            raise InputParsingError("Invalid Name")
-        for i in range(3, len(zone)):
+            raise InputParsingError(f"Invalid connection syntax for {connection} ")
+        for i in range(1, len(connection)):
             try:
-                key, value = zone[i].split('=')
+                key, value = connection[i].split('=')
             except Exception:
-                raise InputParsingError("Invalid key for metadata")
+                raise InputParsingError("Invalid key, value syntax for metadata")
             if key.strip().replace("[",'') not in allowed_keys_connections:
-                raise InputParsingError("Invalid key")
+                raise InputParsingError("Invalid key for metadata")
             metadata_dict[key.strip().replace("[", '')] = value.strip().replace(']','')
         try:
             connections.append(Connection.model_validate(metadata_dict))
@@ -120,7 +124,14 @@ def assign_dict_to_obj(input_dict: Dict[Any, Any]):
             raise InputParsingError("Nice Error message")
     start_hub = input_dict['start_hub'].split(' ')
     end_hub = input_dict['end_hub'].split(' ')
-    return Config(nb_drones=input_dict['nb_drones'], zones=zones, start=(start_hub[1], start_hub[2]), end=(end_hub[1], end_hub[2]), connections=connections)
+    try:
+        return Config(
+            nb_drones=input_dict['nb_drones'],
+            zones=zones, start=(int(start_hub[1]), int(start_hub[2])),
+            end=(int(end_hub[1]), int(end_hub[2])), connections=connections
+            )
+    except Exception:
+        raise InputParsingError("Error with parsing into Config Model")
 
 
 def main() -> None:
@@ -129,6 +140,7 @@ def main() -> None:
         obj = assign_dict_to_obj(dictus)
     except InputParsingError as e:
         print(e)
+        sys.exit(1)
     else:
         print(obj)
 
