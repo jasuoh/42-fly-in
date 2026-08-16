@@ -3,11 +3,8 @@
 from .input_parsing import input_parsing
 
 def main() -> None:
-    try:
-        config_dict = input_parsing()
-        print(config_dict)
-    except Exception as e:
-        print(e)
+    config = input_parsing()
+    print(config._value_dict)
 
 if __name__ == "__main__":
     main()
