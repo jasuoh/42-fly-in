@@ -14,5 +14,5 @@ clean:
 	find . -type d -name .mypy_cache -prune -exec rm -rf {} \;
 
 lint:
-	uv run flake8 .
-	uv run mypy .
+	uv run flake8 src
+	uv run mypy src

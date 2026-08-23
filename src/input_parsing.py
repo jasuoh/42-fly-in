@@ -1,8 +1,8 @@
 #! /usr/bin/env python3
 
 import argparse
-from typing import Dict, Any, List, Tuple
-from pydantic import BaseModel, Field, model_validator, ValidationError
+from typing import Dict
+from pydantic import BaseModel, Field, ValidationError
 from enum import Enum
 import sys
 
@@ -42,10 +42,12 @@ class Config_Map():
         self.end = None
         self.zones = None
         self.connections = None
-        self._value_dict = None
+        self.   _value_dict = None
 
     def _input_parsing_and_error_handling(self) -> None:
-        allowed_keys = ["nb_drones", "start_hub", "end_hub", "hub", "connection"]
+        allowed_keys = [
+            "nb_drones", "start_hub", "end_hub", "hub", "connection"
+        ]
         argument_parser = argparse.ArgumentParser(description="CLI for Fly-In")
         argument_parser.add_argument(
             "--map", default="maps/easy/01_linear_path.txt", dest="maps"
