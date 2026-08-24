@@ -42,7 +42,7 @@ class Config_Map():
         self.end = None
         self.zones = None
         self.connections = None
-        self.   _value_dict = None
+        self._value_dict = None
 
     def _input_parsing_and_error_handling(self) -> None:
         allowed_keys = [
