@@ -2,29 +2,25 @@ from .input_parsing import Config_Map, Zone, Connection
 from pydantic import BaseModel
 
 
-zone_node = {}
 
-class Map():
-    def __init__(self):
-        # zone_node = {}
-        ...
+class Map(BaseModel):
+    dict_zoneNodes: dict = {}
 
     class ZoneNode(BaseModel):
         zone: Zone | None = None
-        neighbor_zones: list[tuple['Zone', 'Connection']] = []
-
-    @staticmethod
-    def assign_Config_to(config: 'Config_Map'):
-        for zone in config.zones:
-            zone_node[zone.name] = Map.ZoneNode(zone=zone)
-            for connection in config.connections:
-                if connection.zone_a.name == zone.name:
-                    zone_node[zone.name].neighbor_zones.append((connection.zone_b, connection))
+        neighbor_zones: list[tuple['Map.ZoneNode', 'Connection']] = []
 
     @classmethod
-    def from_config(config):
-        ...
+    def from_config(cls, config):
+        zoneNode_dict: dict = {}
+        for zone in config.zones:
+            zoneNode_dict[zone.name] = Map.ZoneNode(zone=zone, neighbor_zones=[])
+        for connection in config.connections:
+            node_a = zoneNode_dict.get(connection.zone_a)
+            node_b = zoneNode_dict.get(connection.zone_b)
+            if not node_a or not node_b:
+                return "error"
+            node_a.neighbor_zones.append((node_b, connection))
+            node_b.neighbor_zones.append((node_a, connection))
 
-
-    def find_neighbor(self):
-        ...
+        return cls(dict_zoneNodes=zoneNode_dict)
