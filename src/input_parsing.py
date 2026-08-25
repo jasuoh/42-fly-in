@@ -9,9 +9,19 @@ import sys
 
 class zone_types(Enum):
     normal = 'normal'
-    blocked = 'blocked'
+    blocked = 'blocked' 
     restricted = 'restricted'
     priority = 'priority'
+
+    @property
+    def movement_cost(self):
+        match self:
+            case zone_types.normal | zone_types.priority:
+                return 1
+            case zone_types.restricted:
+                return 2
+            case zone_types.blocked:
+                raise ...
 
 
 class Connection(BaseModel):
@@ -27,6 +37,10 @@ class Zone(BaseModel):
     zone: zone_types = Field(default=zone_types.normal)
     max_drones: int | None = Field(default=None, ge=0)
     color: str | None = Field(default=None)
+
+    @property
+    def cost(self) -> int:
+        return self.zone.movement_cost
 
 
 class InputParsingError(Exception):
@@ -69,7 +83,10 @@ class Config_Map():
                     continue
                 if key.strip() not in allowed_keys:
                     raise InputParsingError(f"Invalid Argument for Map-file: {key.strip()}")
-                if key.strip() not in ["hub", "connection"]:
+                if key.strip() in ['start_hub', 'end_hub']:
+                    value_dict['hub'].append(value.strip())
+                    value_dict[key.strip()] = value.strip().split(' ')[0]
+                elif key.strip() not in ["hub", "connection"]:
                     value_dict[key.strip()] = value.strip()
                 else:
                     value_dict[key.strip()].append(value.strip())
@@ -84,6 +101,7 @@ class Config_Map():
         allowed_keys_connections = ['max_link_capacity']
         zones = []
         connections = []
+
         for zone in input_dict['hub']:
             metadata_dict: Dict = {}
             try:
@@ -107,9 +125,9 @@ class Config_Map():
         for connection in input_dict['connection']:
             metadata_dict = {}
             try:
-                connection = connection.split(" ")
                 if connection.count('-') > 1:
                     raise InputParsingError(f"Invalid connection syntax for {connection}")
+                connection = connection.split(" ")
                 connection_path = connection[0].split('-')
                 metadata_dict['zone_a'] = connection_path[0]
                 metadata_dict['zone_b'] = connection_path[1]
@@ -127,13 +145,11 @@ class Config_Map():
                 connections.append(Connection.model_validate(metadata_dict))
             except ValidationError:
                 raise InputParsingError("Nice Error message")
-        start_hub = input_dict['start_hub'].split(' ')
-        end_hub = input_dict['end_hub'].split(' ')
         try:
+            self.start = input_dict['start_hub']
+            self.end = input_dict['end_hub']
             self.nb_drones = input_dict['nb_drones']
             self.zones = zones
-            self.start = (int(start_hub[1]), int(start_hub[2]))
-            self.end = (int(end_hub[1]), int(end_hub[2]))
             self.connections = connections
         except Exception:
             raise InputParsingError("Error with parsing into Config Model")
