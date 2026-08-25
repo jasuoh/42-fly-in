@@ -1,4 +1,5 @@
 from .input_parsing import Zone, Connection, zone_types
+from heapq import heapify, heappop, heappush
 
 
 class CustomException(Exception):
@@ -13,7 +14,6 @@ class Map():
         def __init__(self, zone: 'Zone'):
             self.zone: Zone = zone
             self.neighbor_zones: list[tuple['Map.ZoneNode', 'Connection']] = []
-            self.cost: int = 1
 
 
     @classmethod
@@ -31,3 +31,41 @@ class Map():
             node_a.neighbor_zones.append((node_b, connection))
             node_b.neighbor_zones.append((node_a, connection))
         return cls(dict_zoneNodes=zoneNode_dict)
+
+
+class Graph():
+    def __init__(self, map: Map):
+        self.graph = map.dict_zoneNodes
+
+    def shortest_distance(self, source: str):
+        distances = {node: float('inf') for node in self.graph}
+        predecessors = {node: node for node in self.graph}
+        distances[source] = 0
+
+        pq = [(0, source)]
+        heapify(pq)
+        visited = set()
+        while pq:
+            current_distance, current_node = heappop(pq)
+            if current_node in visited:
+                continue
+            visited.add(current_node)
+            for neighbor in self.graph[current_node].neighbor_zones:
+                calc_val = current_distance + neighbor[0].zone.cost
+                if calc_val < distances[neighbor[0].zone.name]:
+                    distances[neighbor[0].zone.name] = calc_val
+                    predecessors[neighbor[0].zone.name] = current_node
+                    heappush(pq, (calc_val, neighbor[0].zone.name))
+        return distances, predecessors
+
+    @staticmethod
+    def shortest_path(start_hub: str, end_hub: str, predecessors: dict) -> list[str]:
+        path: list = []
+        curr_zone = end_hub
+        if end_hub not in predecessors.keys():
+            raise CustomException('Invalid config file: No valid path from start to endhub')
+        while curr_zone != start_hub:
+            path.append(curr_zone)
+            curr_zone = predecessors[curr_zone]
+        path.append(start_hub)
+        return path[::-1]
