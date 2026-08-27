@@ -12,7 +12,13 @@ def main() -> None:
     G = Graph(map)
     distances, predecessors = G.shortest_distance(config.start)
     F = DroneFactory(int(config.nb_drones))
-    F.get_drone_list(start_hub=config.start, path=Graph.shortest_path(start_hub=config.start, end_hub=config.end, predecessors=predecessors))
+    F.get_drone_list(
+        start_hub=config.start,
+        path=Graph.shortest_path(
+            start_hub=config.start,
+            end_hub=config.end,
+            predecessors=predecessors)
+    )
     S = Scheduler(map=map, graph=G, drone_list=F.drone_list, config=config)
     
 if __name__ == "__main__":
