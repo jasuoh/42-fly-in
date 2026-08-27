@@ -2,14 +2,18 @@
 
 from .input_parsing import input_parsing
 from .pathfinding_algorithm import Map, Graph
+from .drone_factory import DroneFactory
+from .simulation_engine import Scheduler
 
 def main() -> None:
     config = input_parsing()
+    print(config.zones)
     map = Map.from_config(config)
     G = Graph(map)
-    distances, pred = G.shortest_distance('start')
-    print(G.shortest_path(start_hub=config.start, end_hub=config.end, predecessors=pred))
-
+    distances, predecessors = G.shortest_distance(config.start)
+    F = DroneFactory(int(config.nb_drones))
+    F.get_drone_list(start_hub=config.start, path=Graph.shortest_path(start_hub=config.start, end_hub=config.end, predecessors=predecessors))
+    S = Scheduler(map=map, graph=G, drone_list=F.drone_list, config=config)
     
 if __name__ == "__main__":
     main()

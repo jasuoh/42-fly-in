@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 from .input_parsing import Zone, Connection, zone_types
 from heapq import heapify, heappop, heappush
 
@@ -67,5 +69,5 @@ class Graph():
         while curr_zone != start_hub:
             path.append(curr_zone)
             curr_zone = predecessors[curr_zone]
-        path.append(start_hub)
+        # path.append(start_hub)
         return path[::-1]
