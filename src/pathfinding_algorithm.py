@@ -5,9 +5,6 @@ from heapq import heapify, heappop, heappush
 
 
 class CustomException(Exception):
-    '''
-    Custom Exception for Error managment for graph theorie
-    '''
     def __str__(self):
         return super().__str__()
 
@@ -73,5 +70,4 @@ class Graph():
         while curr_zone != start_hub:
             path.append(curr_zone)
             curr_zone = predecessors[curr_zone]
-        # path.append(start_hub)
         return path[::-1]

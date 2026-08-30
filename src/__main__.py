@@ -5,9 +5,9 @@ from .pathfinding_algorithm import Map, Graph
 from .drone_factory import DroneFactory
 from .simulation_engine import Scheduler
 
+
 def main() -> None:
     config = input_parsing()
-    print(config.zones)
     map = Map.from_config(config)
     G = Graph(map)
     distances, predecessors = G.shortest_distance(config.start)
@@ -20,6 +20,10 @@ def main() -> None:
             predecessors=predecessors)
     )
     S = Scheduler(map=map, graph=G, drone_list=F.drone_list, config=config)
-    
+    log = S.run()
+    print(log)
+    print(S.current_turn)
+
+
 if __name__ == "__main__":
     main()

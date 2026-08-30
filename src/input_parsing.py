@@ -6,6 +6,9 @@ from pydantic import BaseModel, Field, ValidationError
 from enum import Enum
 import sys
 
+class InvalidZoneType(Exception):
+    def __str__(self):
+        return super().__str__()
 
 class zone_types(Enum):
     normal = 'normal'
@@ -21,7 +24,9 @@ class zone_types(Enum):
             case zone_types.restricted:
                 return 2
             case zone_types.blocked:
-                raise ...
+                raise InvalidZoneType(
+                    'Error in calculating the Zone Cost, no Zone cost for restricted Zone!'
+                )
 
 
 class Connection(BaseModel):
@@ -44,10 +49,8 @@ class Zone(BaseModel):
 
 
 class InputParsingError(Exception):
-    """
-    Error with parsing the file
-    """
-
+    def __str__(self):
+        return super().__str__()
 
 class Config_Map():
     def __init__(self):
@@ -155,7 +158,7 @@ class Config_Map():
             raise InputParsingError("Error with parsing into Config Model")
 
     def validation_after_creation(self):
-        ...
+        ... #TODO: validation for map file after checking each line
 
 
 def input_parsing():
