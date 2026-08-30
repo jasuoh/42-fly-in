@@ -24,9 +24,9 @@ class IntroScreen():
                 color = int(15 - dist * 0.2) % 16
                 pyxel.circ(x + offset_x, y + offset_y, 1, color)
 
-        phase += 360 / 30
+            phase += 360 / 30
 
-        pyxel.flip()
+            pyxel.flip()
 
 while True:
     screen = IntroScreen()

@@ -8,6 +8,8 @@ class CustomException(Exception):
     '''
     Custom Exception for Error managment for graph theorie
     '''
+    def __str__(self):
+        return super().__str__()
 
 class Map():
     def __init__(self, dict_zoneNodes = None):
@@ -65,7 +67,9 @@ class Graph():
         path: list = []
         curr_zone = end_hub
         if end_hub not in predecessors.keys():
-            raise CustomException('Invalid config file: No valid path from start to endhub')
+            raise CustomException(
+                'Invalid config file: No valid path from start to endhub'
+            )
         while curr_zone != start_hub:
             path.append(curr_zone)
             curr_zone = predecessors[curr_zone]
