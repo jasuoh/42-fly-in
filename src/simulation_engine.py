@@ -12,21 +12,29 @@ class Scheduler():
             self, map: Map,
             graph: Graph, drone_list: list[Drone],
             config: Config_Map
-        ):
+    ):
         self.map = map
         self.graph = graph
         self.drone_list: list[Drone] = drone_list
-        self.drone_by_id: dict[int, Drone] = {d.drone_id: d for d in drone_list}
-        self.zone_dict: dict[str, Zone] = {zone.name: zone for zone in config.zones}
+        self.drone_by_id: dict[int, Drone] = {
+            d.drone_id: d for d in drone_list
+        }
+        self.zone_dict: dict[str, Zone] = {
+            zone.name: zone for zone in config.zones
+        }
         self.connection_dict: dict[LinkKey, Connection] = {
             frozenset({c.zone_a, c.zone_b}): c for c in config.connections
         }
         self.start: str = config.start
         self.end: str = config.end
         self.current_turn: int = 0
-        self.zone_occupancy: dict[str, int] = {name: 0 for name in self.zone_dict}
+        self.zone_occupancy: dict[str, int] = {
+            name: 0 for name in self.zone_dict
+        }
         self.zone_occupancy[self.start] = len(drone_list)
-        self.zone_reserved: dict[str, int] = {name: 0 for name in self.zone_dict}
+        self.zone_reserved: dict[str, int] = {
+            name: 0 for name in self.zone_dict
+        }
         self.in_flight: dict[int, tuple[LinkKey, str, int]] = {}
 
     def _connection(self, zone_a: str, zone_b: str) -> Connection:

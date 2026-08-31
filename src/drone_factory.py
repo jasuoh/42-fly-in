@@ -24,7 +24,8 @@ class Drone():
         self.current_path.pop(0)
         self.current_zone = destination
         self.current_status = (
-            status_type.delivered if not self.current_path else status_type.can_move
+            status_type.delivered if not self.current_path
+            else status_type.can_move
         )
 
     def start_transit(self) -> str:
@@ -38,7 +39,8 @@ class Drone():
     def complete_transit(self, destination: str) -> None:
         self.current_zone = destination
         self.current_status = (
-            status_type.delivered if not self.current_path else status_type.can_move
+            status_type.delivered if not self.current_path
+            else status_type.can_move
         )
 
 
