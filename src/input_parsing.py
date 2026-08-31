@@ -6,13 +6,15 @@ from pydantic import BaseModel, Field, ValidationError
 from enum import Enum
 import sys
 
+
 class InvalidZoneType(Exception):
     def __str__(self):
         return super().__str__()
 
+
 class zone_types(Enum):
     normal = 'normal'
-    blocked = 'blocked' 
+    blocked = 'blocked'
     restricted = 'restricted'
     priority = 'priority'
 
@@ -25,7 +27,8 @@ class zone_types(Enum):
                 return 2
             case zone_types.blocked:
                 raise InvalidZoneType(
-                    'Error in calculating the Zone Cost, no Zone cost for restricted Zone!'
+                    'Error in calculating the Zone Cost,'
+                    'no Zone cost for restricted Zone!'
                 )
 
 
@@ -51,6 +54,7 @@ class Zone(BaseModel):
 class InputParsingError(Exception):
     def __str__(self):
         return super().__str__()
+
 
 class Config_Map():
     def __init__(self):
@@ -85,7 +89,9 @@ class Config_Map():
                     print(f"Warning: Skipping malformed config line: {line}")
                     continue
                 if key.strip() not in allowed_keys:
-                    raise InputParsingError(f"Invalid Argument for Map-file: {key.strip()}")
+                    raise InputParsingError(
+                        f"Invalid Argument for Map-file: {key.strip()}"
+                    )
                 if key.strip() in ['start_hub', 'end_hub']:
                     value_dict['hub'].append(value.strip())
                     value_dict[key.strip()] = value.strip().split(' ')[0]
@@ -96,7 +102,6 @@ class Config_Map():
         except Exception as e:
             print(e)
         self._value_dict = value_dict
-
 
     def _assign_dict_to_obj(self):
         input_dict = self._value_dict
@@ -117,10 +122,17 @@ class Config_Map():
                 try:
                     key, value = zone[i].split('=')
                 except Exception:
-                    raise InputParsingError(f"Inputparsing Error: Invalid key")
-                if key.strip().replace('[','') not in allowed_keys_zones:
-                    raise InputParsingError(f'Inputparsing Error: {key.strip().replace("[", "")} is invalid!')
-                metadata_dict[key.strip().replace("[", '')] = value.strip().replace(']', '')
+                    raise InputParsingError(
+                        "Inputparsing Error: Invalid key"
+                    )
+                if key.strip().replace('[', '') not in allowed_keys_zones:
+                    raise InputParsingError(
+                        f'Inputparsing Error: {key.strip().replace("[", "")}'
+                        'is invalid!'
+                    )
+                metadata_dict[
+                    key.strip().replace("[", '')
+                ] = value.strip().replace(']', '')
             try:
                 zones.append(Zone.model_validate(metadata_dict))
             except ValidationError:
@@ -129,21 +141,31 @@ class Config_Map():
             metadata_dict = {}
             try:
                 if connection.count('-') > 1:
-                    raise InputParsingError(f"Invalid connection syntax for {connection}")
+                    raise InputParsingError(
+                        f"Invalid connection syntax for {connection}"
+                    )
                 connection = connection.split(" ")
                 connection_path = connection[0].split('-')
                 metadata_dict['zone_a'] = connection_path[0]
                 metadata_dict['zone_b'] = connection_path[1]
             except Exception:
-                raise InputParsingError(f"Invalid connection syntax for {connection} ")
+                raise InputParsingError(
+                    f"Invalid connection syntax for {connection} "
+                )
             for i in range(1, len(connection)):
                 try:
                     key, value = connection[i].split('=')
                 except Exception:
-                    raise InputParsingError("Invalid key, value syntax for metadata")
-                if key.strip().replace("[",'') not in allowed_keys_connections:
+                    raise InputParsingError(
+                        "Invalid key, value syntax for metadata"
+                    )
+                if key.strip().replace(
+                    "[", ''
+                ) not in allowed_keys_connections:
                     raise InputParsingError("Invalid key for metadata")
-                metadata_dict[key.strip().replace("[", '')] = value.strip().replace(']','')
+                metadata_dict[
+                    key.strip().replace("[", '')
+                ] = value.strip().replace(']', '')
             try:
                 connections.append(Connection.model_validate(metadata_dict))
             except ValidationError:
@@ -158,7 +180,7 @@ class Config_Map():
             raise InputParsingError("Error with parsing into Config Model")
 
     def validation_after_creation(self):
-        ... #TODO: validation for map file after checking each line
+        ...  # TODO: validation for map file after checking each line
 
 
 def input_parsing():

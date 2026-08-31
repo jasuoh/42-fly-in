@@ -1,2 +1,2 @@
 #! /usr/bin/env python3
-#TODO: visual schreiben
+# TODO: Output schreiben entweder in file oder printen

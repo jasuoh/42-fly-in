@@ -8,14 +8,15 @@ class CustomException(Exception):
     def __str__(self):
         return super().__str__()
 
+
 class Map():
-    def __init__(self, dict_zoneNodes = None):
+    def __init__(self, dict_zoneNodes=None):
         self.dict_zoneNodes: dict = dict_zoneNodes or {}
+
     class ZoneNode():
         def __init__(self, zone: 'Zone'):
             self.zone: Zone = zone
             self.neighbor_zones: list[tuple['Map.ZoneNode', 'Connection']] = []
-
 
     @classmethod
     def from_config(cls, config):
@@ -60,7 +61,9 @@ class Graph():
         return distances, predecessors
 
     @staticmethod
-    def shortest_path(start_hub: str, end_hub: str, predecessors: dict) -> list[str]:
+    def shortest_path(
+        start_hub: str, end_hub: str, predecessors: dict
+    ) -> list[str]:
         path: list = []
         curr_zone = end_hub
         if end_hub not in predecessors.keys():
