@@ -10,7 +10,7 @@ def main() -> None:
     config = input_parsing()
     map = Map.from_config(config)
     G = Graph(map)
-    distances, predecessors = G.shortest_distance(config.start)
+    _, predecessors = G.shortest_distance(config.start)
     F = DroneFactory(int(config.nb_drones))
     F.get_drone_list(
         start_hub=config.start,
