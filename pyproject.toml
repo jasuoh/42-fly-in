@@ -10,6 +10,5 @@ dependencies = [
     "pydantic>=2.13.4",
     "pygame>=2.6.1",
     "pygame-ce>=2.5.8",
-    "pyxel>=2.9.5",
     "rich>=15.0.0",
 ]
