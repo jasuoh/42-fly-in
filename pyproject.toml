@@ -1,7 +1,7 @@
 [project]
 name = "42-Fly-Nn"
 version = "0.1.0"
-description = "Add your description here"
+description = "Fly-In-Project of jawosylu   "
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
