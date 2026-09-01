@@ -4,6 +4,7 @@ from .input_parsing import input_parsing
 from .pathfinding_algorithm import Map, Graph
 from .drone_factory import DroneFactory
 from .simulation_engine import Scheduler
+from .visual.visual_representation import Visualizer
 
 
 def main() -> None:
@@ -21,9 +22,8 @@ def main() -> None:
     )
     S = Scheduler(map=map, graph=G, drone_list=F.drone_list, config=config)
     log = S.run()
-    print(log)
-    print(S.current_turn)
-
+    vis = Visualizer(800, 600, config.zones, config.connections)
+    vis.run()
 
 if __name__ == "__main__":
     main()

@@ -36,7 +36,7 @@ class Connection(BaseModel):
     zone_a: str = Field(...)
     zone_b: str = Field(...)
     max_link_capacity: int = Field(default=None, ge=0)
-    color: str = Field(default=None)
+    color: str = Field(default='Green')
 
 
 class Zone(BaseModel):
@@ -44,7 +44,7 @@ class Zone(BaseModel):
     coordinates: tuple[int, int] = Field(...)
     zone: zone_types = Field(default=zone_types.normal)
     max_drones: int | None = Field(default=None, ge=0)
-    color: str | None = Field(default=None)
+    color: str | None = Field(default='Red')
 
     @property
     def cost(self) -> int:
