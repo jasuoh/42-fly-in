@@ -339,18 +339,19 @@ class Visualizer():
         self.scheduler = scheduler
         self.scenes: list[Scene] = []
         self._font: pg.font.Font | None = None
+        self._font_intro: pg.font.Font | None = None
 
     def _make_scene(self, name: str) -> Scene:
         background = Background(self.height, self._BACKGROUND_LAYERS)
         particles = ParticleSystem([Snowflake(self.width, self.height) for _ in range(35)])
         if name == 'intro':
-            return IntroScreen(background, particles, self._font)
+            return IntroScreen(background, particles, self._font_intro)
         if name == 'menu':
             items = [
                 MenuItem('start', (100, 100), 'drone'),
                 MenuItem('quit', (100, 150), 'quit')
             ]
-            return Menu(background, particles, self._font, items)
+            return Menu(background, particles, self._font_intro, items)
         if name == 'drone':
             return DroneScreen(
                 background,
@@ -365,9 +366,12 @@ class Visualizer():
     def run(self) -> None:
         pg.init()
         screen = pg.display.set_mode((self.width, self.height))
+        icon_surface = pg.image.load('src/visual/assets/flyin_pixel_128.png').convert()
+        pg.display.set_icon(icon_surface)
         pg.display.set_caption('Fly-In')
         clock = pg.time.Clock()
-        self._font = pg.font.SysFont('consolas', 22)
+        self._font_intro = pg.font.SysFont('consolas', 22)
+        self._font = pg.font.SysFont('consolas', 15)
 
         self.scenes = [self._make_scene('intro')]
         while True:
