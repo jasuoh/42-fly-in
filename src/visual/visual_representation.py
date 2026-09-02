@@ -159,6 +159,8 @@ class IntroScreen(BaseScene):
     def handle_event(self, event: pg.event.Event) -> None:
         if event.type == pg.KEYDOWN:
             self._elapsed = self.duration
+        elif event.type == pg.MOUSEBUTTONDOWN:
+            self._elapsed = self.duration
 
     def update_content(self, dt: float) -> None:
         self._elapsed += dt
@@ -166,9 +168,9 @@ class IntroScreen(BaseScene):
     def draw_content(self, surface: pg.Surface) -> None:
         label = self.font.render('Fly-In', True, 'White')
         name = self.font.render('by jawosylu', True, 'White')
-        name_rect = name.get_rect(center=(100, 50))
+        name_rect = name.get_rect(topleft=(0,0))
         rect = label.get_rect(
-            center=(surface.get_width() // 2, surface.get_height() // 2 - 200)
+            center=(surface.get_width() // 2, surface.get_height() // 3)
         )
         surface.blit(label, rect)
         surface.blit(name, name_rect)
@@ -284,7 +286,7 @@ class DroneScreen(BaseScene):
             surface.blit(label, label_rect)
         for name, pos in self.zone_positions.items():
             pg.draw.circle(surface, colors[name], pos, 25)
-        win_size = surface.get_size()
+        win_size = surface.get_size() if len(list_zones) < 10 else (0.5 * max_x + 100, 0.5 * max_y + 100)
         return pg.transform.smoothscale(surface, win_size) # TODO: richtig scalen auf die res
 
     def handle_event(self, event: pg.event.Event) -> None:
@@ -312,6 +314,9 @@ class DroneScreen(BaseScene):
                 continue
             pos = self.zone_positions[drone.current_zone]
             pg.draw.circle(surface, 'Black', (pos[0] + 200, pos[1] + 200), 8)
+        turn_count = self.font.render(str(self.scheduler.current_turn), True, 'White')
+        turn_rect = turn_count.get_rect(topleft=(0,0))
+        surface.blit(turn_count, turn_rect)
 
     def next_scene(self) -> str | None:
         return 'menu' if self._finished else None
@@ -320,11 +325,12 @@ class DroneScreen(BaseScene):
 class Visualizer():
     _BACKGROUND_LAYERS: list[tuple[str, float, bool]] = [
         ('src/visual/assets/1.png', 0.2, False),
-        ('src/visual/assets/2.png', 0.2, True),
+        ('src/visual/assets/2.png', 0.35, True),
         ('src/visual/assets/3.png', 0.5, True),
         ('src/visual/assets/4.png', 0.8, True),
     ]
     def __init__(
+        
         self,
         width: int,
         height: int,
@@ -341,6 +347,7 @@ class Visualizer():
         self._font: pg.font.Font | None = None
         self._font_intro: pg.font.Font | None = None
 
+
     def _make_scene(self, name: str) -> Scene:
         background = Background(self.height, self._BACKGROUND_LAYERS)
         particles = ParticleSystem([Snowflake(self.width, self.height) for _ in range(35)])
@@ -348,8 +355,9 @@ class Visualizer():
             return IntroScreen(background, particles, self._font_intro)
         if name == 'menu':
             items = [
-                MenuItem('start', (100, 100), 'drone'),
-                MenuItem('quit', (100, 150), 'quit')
+                MenuItem('start', (self.height // 4, 150), 'drone'),
+                MenuItem('back', (self.height // 4, 200), 'intro'),
+                MenuItem('quit', (self.height // 4, 250), 'quit')
             ]
             return Menu(background, particles, self._font_intro, items)
         if name == 'drone':
@@ -366,12 +374,12 @@ class Visualizer():
     def run(self) -> None:
         pg.init()
         screen = pg.display.set_mode((self.width, self.height))
-        icon_surface = pg.image.load('src/visual/assets/flyin_pixel_128.png').convert()
+        icon_surface = pg.image.load('src/visual/assets/icon_128.png').convert()
         pg.display.set_icon(icon_surface)
         pg.display.set_caption('Fly-In')
         clock = pg.time.Clock()
-        self._font_intro = pg.font.SysFont('consolas', 22)
-        self._font = pg.font.SysFont('consolas', 15)
+        self._font_intro = pg.font.SysFont('consolas', 25)
+        self._font = pg.font.SysFont('consolas', 18)
 
         self.scenes = [self._make_scene('intro')]
         while True:
