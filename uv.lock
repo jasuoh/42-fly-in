@@ -8,7 +8,7 @@ resolution-markers = [
 ]
 
 [[package]]
-name = "42-fly-nn"
+name = "42-fly-in"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
