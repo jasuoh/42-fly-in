@@ -233,6 +233,9 @@ class Menu(BaseScene):
 
 
 class DroneScreen(BaseScene):
+    min_radius = 6
+    max_radius = 25
+    padding = 20
     def __init__(
         self,
         background: Background,
@@ -241,7 +244,9 @@ class DroneScreen(BaseScene):
         list_zones: list[Zone],
         list_connections: list[Connection],
         scheduler: Scheduler,
-        turn_interval: float = 2,
+        screen_width: int,
+        screen_height: int,
+        turn_interval: float = 2
     ) -> None:
         super().__init__(background, particles)
         self.font = font
@@ -249,21 +254,23 @@ class DroneScreen(BaseScene):
         self.turn_interval = turn_interval
         self._elapsed = 0.0
         self._finished = False
-        self.zone_positions = self._compute_positions(list_zones)
+        self.margin_x = None
+        self.margin_y = None
+        self.width = screen_width
+        self.height = screen_height
+        self._screen_positions = None
+        self.zone_positions = self._calculate_margin(list_zones)
         self._static_surface = self._draw_zones_and_connections(
             list_zones, list_connections
         )
 
-    def _compute_positions(
-        self, list_zones: list[Zone]
-    ) -> dict:
-        return {
-            zone.name: (
-                zone.coordinates[0] * (25 * len(list_zones)) + 100,
-                zone.coordinates[1] * (25 * len(list_zones)) + 100,
-            )
-            for zone in list_zones
-        }
+    def _calculate_margin(self, list_zones: list[Zone]):
+        max_name_w = max([self.font.size(zone.name)[0] for zone in list_zones])
+        name_h = self.font.size(list_zones[0].name)[1]
+        self.margin_x = max(self.max_radius, max_name_w // 2) + self.padding
+        self.margin_y = self.max_radius + name_h + self.padding
+        return {zone.name: (zone.coordinates[0], zone.coordinates[1]) for zone in list_zones}
+
 
     def _draw_zones_and_connections(
         self,
@@ -272,22 +279,35 @@ class DroneScreen(BaseScene):
     ) -> pg.Surface:
         max_x = max(pos[0] for pos in self.zone_positions.values())
         max_y = max(pos[1] for pos in self.zone_positions.values())
+        min_x = min(pos[0] for pos in self.zone_positions.values())
+        min_y = min(pos[1] for pos in self.zone_positions.values())
+        used_width = self.width - 2 * self.margin_x
+        used_height = self.height - 2 * self.margin_y
+        bbox_width = max_x - min_x
+        bbox_height = max_y - min_y
+        if bbox_height == 0: bbox_height = 1
+        if bbox_width == 0: bbox_width = 1
+        scale = min(used_width / bbox_width, used_height / bbox_height)
+        offset_x = self.margin_x + (used_width - bbox_width * scale) / 2 - min_x * scale
+        offset_y = self.margin_y + (used_height - bbox_height * scale) / 2 - min_y * scale
+        screen_positions = {zone.name: (zone.coordinates[0] * scale + offset_x, zone.coordinates[1] * scale + offset_y) for zone in list_zones}
+        self._screen_positions = screen_positions
+        radius = max(self.min_radius, min(scale * 2, self.max_radius))
         surface = pg.Surface(
-            (max_x + 100, max_y + 100), pg.SRCALPHA
+            (self.width, self.height), pg.SRCALPHA
         )
         colors = {zone.name: zone.color or 'Red' for zone in list_zones}
         for connection in list_connections:
-            start = self.zone_positions[connection.zone_a]
-            end = self.zone_positions[connection.zone_b]
+            start = screen_positions[connection.zone_a]
+            end = screen_positions[connection.zone_b]
             pg.draw.line(surface, connection.color, start, end, 5)
-        for name, pos in self.zone_positions.items():
+        for name, pos in screen_positions.items():
             label = self.font.render(name, True, 'Black')
             label_rect = label.get_rect(center=(pos[0], pos[1] + 35))
             surface.blit(label, label_rect)
-        for name, pos in self.zone_positions.items():
-            pg.draw.circle(surface, colors[name], pos, 25)
-        win_size = surface.get_size() if len(list_zones) < 10 else (0.5 * max_x + 100, 0.5 * max_y + 100)
-        return pg.transform.smoothscale(surface, win_size) # TODO: richtig scalen auf die res
+        for name, pos in screen_positions.items():
+            pg.draw.circle(surface, colors[name], pos, radius)
+        return surface # TODO: richtig scalen auf die res
 
     def handle_event(self, event: pg.event.Event) -> None:
         if event.type == pg.KEYDOWN:
@@ -308,12 +328,11 @@ class DroneScreen(BaseScene):
         )
 
     def draw_content(self, surface: pg.Surface) -> None:
-        surface.blit(self._static_surface, (200, 200))
+        surface.blit(self._static_surface, (0,0))
         for drone in self.scheduler.drone_list:
             if drone.current_zone is None:
                 continue
-            pos = self.zone_positions[drone.current_zone]
-            pg.draw.circle(surface, 'Black', (pos[0] + 200, pos[1] + 200), 8)
+            pg.draw.circle(surface, 'Black', (self._screen_positions[drone.current_zone]), 8)
         turn_count = self.font.render(str(self.scheduler.current_turn), True, 'White')
         turn_rect = turn_count.get_rect(topleft=(0,0))
         surface.blit(turn_count, turn_rect)
@@ -368,6 +387,8 @@ class Visualizer():
                 self.list_zones,
                 self.list_connections,
                 self.scheduler,
+                self.width,
+                self.height
             )
         raise ValueError(f'Unknown scene: {name}')
 
@@ -380,7 +401,6 @@ class Visualizer():
         clock = pg.time.Clock()
         self._font_intro = pg.font.SysFont('consolas', 25)
         self._font = pg.font.SysFont('consolas', 18)
-
         self.scenes = [self._make_scene('intro')]
         while True:
             dt = clock.tick(60) / 1000
@@ -396,11 +416,9 @@ class Visualizer():
                     pg.quit()
                     sys.exit()
                 current.handle_event(event)
-
             current.update(dt)
             current.draw(screen)
             pg.display.update()
-
             target = current.next_scene()
             if target == 'quit':
                 pg.quit()
