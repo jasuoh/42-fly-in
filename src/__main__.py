@@ -21,8 +21,9 @@ def main() -> None:
             predecessors=predecessors)
     )
     S = Scheduler(map=map, graph=G, drone_list=F.drone_list, config=config)
-    Visualizer(1000, 1000, config.zones, config.connections, S).run()
 
+    Visualizer(config.zones, config.connections, S).run()
+    
 
 if __name__ == "__main__":
     main()

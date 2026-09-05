@@ -78,7 +78,7 @@ class Background():
     def _load_img(
         path: str, height: int, has_alpha: bool
     ) -> pg.Surface:
-        scale = 1.2
+        scale = 1.5
         image = (
             pg.image.load(path).convert_alpha() if has_alpha
             else pg.image.load(path).convert()
@@ -234,10 +234,9 @@ class Menu(BaseScene):
 
 
 class DroneScreen(BaseScene):
-    min_radius = 6
+    min_radius = 5
     max_radius = 25
-    padding = 20
-
+    padding = 10
     def __init__(
         self,
         background: Background,
@@ -248,7 +247,7 @@ class DroneScreen(BaseScene):
         scheduler: Scheduler,
         screen_width: int,
         screen_height: int,
-        turn_interval: float = 2
+        turn_interval: float = 1
     ) -> None:
         super().__init__(background, particles)
         self.font = font
@@ -258,6 +257,7 @@ class DroneScreen(BaseScene):
         self._finished = False
         self.margin_x = None
         self.margin_y = None
+        self.pause = False
         self.width = screen_width
         self.height = screen_height
         self._screen_positions = None
@@ -265,6 +265,12 @@ class DroneScreen(BaseScene):
         self._static_surface = self._draw_zones_and_connections(
             list_zones, list_connections
         )
+
+    def _draw_log(self):
+        ...
+
+    def _draw_infos(self):
+        ...
 
     def _calculate_margin(self, list_zones: list[Zone]):
         max_name_w = max([self.font.size(zone.name)[0] for zone in list_zones])
@@ -322,21 +328,24 @@ class DroneScreen(BaseScene):
             label_rect = label.get_rect(center=(pos[0], pos[1] + 35))
             surface.blit(label, label_rect)
         for name, pos in screen_positions.items():
-            pg.draw.circle(surface, colors[name], pos, radius)
-        return surface  # TODO: richtig scalen auf die res
+            pg.draw.circle(surface, colors[name], pos, radius) # TODO: color fix for not right formated colors in map file
+        return surface
 
     def handle_event(self, event: pg.event.Event) -> None:
-        if event.type == pg.KEYDOWN:
-            ...
+        if event.type == pg.KEYDOWN and event.key == pg.K_RIGHT:
+            self._elapsed = self.turn_interval
+        elif event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
+            self.pause = not self.pause # TODO: Pause Button implementieren
+        
 
     def update_content(self, dt: float) -> None:
-        if self._finished:
+        if self._finished or self.pause:
             return
         self._elapsed += dt
         if self._elapsed < self.turn_interval:
             return
         self._elapsed = 0.0
-        self.scheduler.gen_turn()
+        print(f"Turn: {self.scheduler.current_turn + 1}, Move: {self.scheduler.gen_turn()}\n") # TODO: remove / only debugging
         self._finished = all(
             drone.current_status == status_type.delivered
             for drone in self.scheduler.drone_list
@@ -347,13 +356,9 @@ class DroneScreen(BaseScene):
         for drone in self.scheduler.drone_list:
             if drone.current_zone is None:
                 continue
-            pg.draw.circle(
-                surface, 'Black', (
-                    self._screen_positions[drone.current_zone]
-                ), 8)
-        turn_count = self.font.render(
-            str(self.scheduler.current_turn), True, 'White')
-        turn_rect = turn_count.get_rect(topleft=(0, 0))
+            pg.draw.circle(surface, 'Black', (self._screen_positions[drone.current_zone]), 8)
+        turn_count = self.font.render(f"Turn: {str(self.scheduler.current_turn)}", True, 'White')
+        turn_rect = turn_count.get_rect(topleft=(0,0))
         surface.blit(turn_count, turn_rect)
 
     def next_scene(self) -> str | None:
@@ -370,14 +375,12 @@ class Visualizer():
 
     def __init__(
         self,
-        width: int,
-        height: int,
         list_zones: list[Zone],
         list_connections: list[Connection],
         scheduler: Scheduler,
     ) -> None:
-        self.width = width
-        self.height = height
+        self.width = 1200
+        self.height = 800
         self.list_zones = list_zones
         self.list_connections = list_connections
         self.scheduler = scheduler
@@ -414,10 +417,9 @@ class Visualizer():
 
     def run(self) -> None:
         pg.init()
-        screen = pg.display.set_mode((self.width, self.height))
-        icon_surface = pg.image.load(
-            'src/visual/assets/icon_128.png'
-        ).convert()
+        screen = pg.display.set_mode((self.width, self.height), pg.RESIZABLE | pg.SCALED)
+        screen.fill('White')
+        icon_surface = pg.image.load('src/visual/assets/icon_128.png').convert()
         pg.display.set_icon(icon_surface)
         pg.display.set_caption('Fly-In')
         clock = pg.time.Clock()
