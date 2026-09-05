@@ -177,6 +177,11 @@ class IntroScreen(BaseScene):
         name_b_rect = name_b.get_rect(topleft=(3, 3))
         name_rect = name.get_rect(topleft=(0, 0))
         rect = label.get_rect(center=(surface.get_width() // 2, surface.get_height() // 3))
+        # only for test case
+
+        label_ins = self.font_l.render('Press a key or the mouse to start!', True, 'White')
+        rect_ins = label_ins.get_rect(center=(surface.get_width() // 2, surface.get_height() - 100))
+        surface.blit(label_ins, rect_ins)
         surface.blit(name_b, name_b_rect)
         surface.blit(label_b, rect_b)
         surface.blit(label, rect)
@@ -370,6 +375,55 @@ class DroneScreen(BaseScene):
     def next_scene(self) -> str | None:
         return 'menu' if self._finished else None
 
+class MapItem():
+    def __init__(self, label, path, pos, target):
+        self.label = label
+        self.path = path
+        self.pos = pos
+        self.target = target
+
+class MapSelection(BaseScene):
+        # TODO: Map Selection Szene for all the different szenes
+        def __init__(self, background, particles, avaiable_maps: list[MapItem], offset_x, offset_y, scale, font):
+            self.target = 0
+            self.maps = avaiable_maps
+            self.offset_x = offset_x
+            self.offset_y = offset_y
+            self._chosen = None
+            self.scale = scale
+            self.font = font
+            super().__init__(background, particles)
+
+        def handle_event(self, event: pg.event.Event) -> None:
+            if event.type == pg.MOUSEMOTION:
+                for index, item in enumerate(self.maps):
+                    if item.rect and item.rect.collidepoint(event.pos):
+                        self.target = index
+            elif event.type == pg.MOUSEBUTTONDOWN:
+                item = self.maps[self.target]
+                if item.rect and item.rect.collidepoint(event.pos):
+                    self._chosen = item.target
+            elif event.type == pg.KEYDOWN:
+                if event.key == pg.K_DOWN:
+                    self.target = (self.target + 1) % len(self.items)
+                elif event.key == pg.K_UP:
+                    self.target = (self.target - 1) % len(self.items)
+                elif event.key == pg.K_RETURN:
+                    self._chosen = self.maps[self.target].target
+
+        def update_content(self, dt):
+            ...
+        def draw_content(self, surface):
+            for index, item in enumerate(self.maps):
+                color = 'Purple' if index == self.target else 'White'
+                label = self.font.render(item.label, True, color)
+                item.rect = label.get_rect(topleft=item.pos)
+                surface.blit(label, item.pos)
+
+
+        def next_scene(self):
+            return self._chosen
+
 
 class Visualizer():
     _BACKGROUND_LAYERS: list[tuple[str, float, bool]] = [
@@ -403,9 +457,9 @@ class Visualizer():
             return IntroScreen(background, particles, self._font_intro, self._font)
         if name == 'menu':
             items = [
-                MenuItem('start', (self.height // 5, 150), 'drone'),
-                MenuItem('back', (self.height // 5, 200), 'intro'),
-                MenuItem('quit', (self.height // 5, 250), 'quit')
+                MenuItem('start', (self.width // 5, 150), 'map'),
+                MenuItem('back', (self.width // 5, 200), 'intro'),
+                MenuItem('quit', (self.width // 5, 250), 'quit')
             ]
             return Menu(background, particles, self._font_intro, items)
         if name == 'drone':
@@ -419,6 +473,9 @@ class Visualizer():
                 self.width,
                 self.height
             )
+        if name == 'map':
+            items = [MapItem('map1', None, (self.width // 2, 100), 'drone'),]
+            return MapSelection(background, particles, items, None, None, None, self._font)
         raise ValueError(f'Unknown scene: {name}')
 
     def run(self) -> None:
