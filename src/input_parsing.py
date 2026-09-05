@@ -8,8 +8,8 @@ import sys
 
 
 class InvalidZoneType(Exception):
-    def __str__(self):
-        return super().__str__()
+    def __str__(self) -> None:
+        ...
 
 
 class zone_types(Enum):
@@ -19,7 +19,7 @@ class zone_types(Enum):
     priority = 'priority'
 
     @property
-    def movement_cost(self):
+    def movement_cost(self) -> int:
         match self:
             case zone_types.normal | zone_types.priority:
                 return 1
@@ -35,7 +35,7 @@ class zone_types(Enum):
 class Connection(BaseModel):
     zone_a: str = Field(...)
     zone_b: str = Field(...)
-    max_link_capacity: int = Field(default=None, ge=0)
+    max_link_capacity: int | None = Field(default=None, ge=0)
     color: str = Field(default='Green')
 
 
@@ -44,7 +44,7 @@ class Zone(BaseModel):
     coordinates: tuple[int, int] = Field(...)
     zone: zone_types = Field(default=zone_types.normal)
     max_drones: int | None = Field(default=None, ge=0)
-    color: str | None = Field(default='Red')
+    color: str = Field(default='Red')
 
     @property
     def cost(self) -> int:
