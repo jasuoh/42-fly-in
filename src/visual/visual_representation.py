@@ -150,10 +150,12 @@ class IntroScreen(BaseScene):
         background: Background,
         particles: ParticleSystem,
         font: pg.font.Font,
+        font_l: pg.font.Font,
         duration: float = 25,
     ) -> None:
         super().__init__(background, particles)
         self.font = font
+        self.font_l = font_l
         self.duration = duration
         self._elapsed = 0.0
 
@@ -168,11 +170,15 @@ class IntroScreen(BaseScene):
 
     def draw_content(self, surface: pg.Surface) -> None:
         label = self.font.render('Fly-In', True, 'White')
-        name = self.font.render('by jawosylu', True, 'White')
+        label_b = self.font.render('Fly-In', True, 'mediumpurple1')
+        rect_b = label_b.get_rect(center=(surface.get_width() // 2 + 3, surface.get_height() // 3 + 3))
+        name = self.font_l.render('by jawosylu', True, 'White')
+        name_b = self.font_l.render('by jawosylu', True, 'mediumpurple1')
+        name_b_rect = name_b.get_rect(topleft=(3, 3))
         name_rect = name.get_rect(topleft=(0, 0))
-        rect = label.get_rect(
-            center=(surface.get_width() // 2, surface.get_height() // 3)
-        )
+        rect = label.get_rect(center=(surface.get_width() // 2, surface.get_height() // 3))
+        surface.blit(name_b, name_b_rect)
+        surface.blit(label_b, rect_b)
         surface.blit(label, rect)
         surface.blit(name, name_rect)
 
@@ -267,10 +273,10 @@ class DroneScreen(BaseScene):
         )
 
     def _draw_log(self):
-        ...
+        ...  # TODO: log pannel on one of the sides
 
     def _draw_infos(self):
-        ...
+        ... # TODO: draw infos for each drone on hover
 
     def _calculate_margin(self, list_zones: list[Zone]):
         max_name_w = max([self.font.size(zone.name)[0] for zone in list_zones])
@@ -324,12 +330,12 @@ class DroneScreen(BaseScene):
             end = screen_positions[connection.zone_b]
             pg.draw.line(surface, connection.color, start, end, 5)
         for name, pos in screen_positions.items():
-            label = self.font.render(name, True, 'Black')
+            label = self.font.render(name, True, 'Black') # TODO: scaled fonts
             label_rect = label.get_rect(center=(pos[0], pos[1] + 35))
             surface.blit(label, label_rect)
         for name, pos in screen_positions.items():
             pg.draw.circle(surface, colors[name], pos, radius) # TODO: color fix for not right formated colors in map file
-        return surface
+        return surface # TODO: add legend
 
     def handle_event(self, event: pg.event.Event) -> None:
         if event.type == pg.KEYDOWN and event.key == pg.K_RIGHT:
@@ -356,7 +362,7 @@ class DroneScreen(BaseScene):
         for drone in self.scheduler.drone_list:
             if drone.current_zone is None:
                 continue
-            pg.draw.circle(surface, 'Black', (self._screen_positions[drone.current_zone]), 8)
+            pg.draw.circle(surface, 'Black', (self._screen_positions[drone.current_zone]), 8)  # TODO: Drone animation
         turn_count = self.font.render(f"Turn: {str(self.scheduler.current_turn)}", True, 'White')
         turn_rect = turn_count.get_rect(topleft=(0,0))
         surface.blit(turn_count, turn_rect)
@@ -394,12 +400,12 @@ class Visualizer():
             [Snowflake(self.width, self.height) for _ in range(35)]
         )
         if name == 'intro':
-            return IntroScreen(background, particles, self._font_intro)
+            return IntroScreen(background, particles, self._font_intro, self._font)
         if name == 'menu':
             items = [
-                MenuItem('start', (self.height // 4, 150), 'drone'),
-                MenuItem('back', (self.height // 4, 200), 'intro'),
-                MenuItem('quit', (self.height // 4, 250), 'quit')
+                MenuItem('start', (self.height // 5, 150), 'drone'),
+                MenuItem('back', (self.height // 5, 200), 'intro'),
+                MenuItem('quit', (self.height // 5, 250), 'quit')
             ]
             return Menu(background, particles, self._font_intro, items)
         if name == 'drone':
@@ -423,7 +429,7 @@ class Visualizer():
         pg.display.set_icon(icon_surface)
         pg.display.set_caption('Fly-In')
         clock = pg.time.Clock()
-        self._font_intro = pg.font.SysFont('consolas', 25)
+        self._font_intro = pg.font.SysFont('consolas', 30)
         self._font = pg.font.SysFont('consolas', 18)
         self.scenes = [self._make_scene('intro')]
         while True:
