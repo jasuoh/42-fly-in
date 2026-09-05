@@ -16,7 +16,6 @@ from ..input_parsing import Connection, Zone
 from ..simulation_engine import Scheduler
 
 
-
 class Particle(ABC):
     def __init__(self, screen_width: int, screen_height: int) -> None:
         self.screen_width = screen_width
@@ -44,6 +43,7 @@ class Snowflake(Particle):
             self.radius
         )
 
+
 class ParticleSystem():
     def __init__(self, particles: list[Particle]) -> None:
         self.particles = particles
@@ -63,6 +63,7 @@ class Background():
             self.image = image
             self.speed = speed
             self.scroll: float = 0.0
+
     def __init__(
         self,
         height: int,
@@ -168,7 +169,7 @@ class IntroScreen(BaseScene):
     def draw_content(self, surface: pg.Surface) -> None:
         label = self.font.render('Fly-In', True, 'White')
         name = self.font.render('by jawosylu', True, 'White')
-        name_rect = name.get_rect(topleft=(0,0))
+        name_rect = name.get_rect(topleft=(0, 0))
         rect = label.get_rect(
             center=(surface.get_width() // 2, surface.get_height() // 3)
         )
@@ -236,6 +237,7 @@ class DroneScreen(BaseScene):
     min_radius = 6
     max_radius = 25
     padding = 20
+
     def __init__(
         self,
         background: Background,
@@ -269,8 +271,10 @@ class DroneScreen(BaseScene):
         name_h = self.font.size(list_zones[0].name)[1]
         self.margin_x = max(self.max_radius, max_name_w // 2) + self.padding
         self.margin_y = self.max_radius + name_h + self.padding
-        return {zone.name: (zone.coordinates[0], zone.coordinates[1]) for zone in list_zones}
-
+        return {
+            zone.name: (zone.coordinates[0], zone.coordinates[1])
+            for zone in list_zones
+        }
 
     def _draw_zones_and_connections(
         self,
@@ -285,12 +289,24 @@ class DroneScreen(BaseScene):
         used_height = self.height - 2 * self.margin_y
         bbox_width = max_x - min_x
         bbox_height = max_y - min_y
-        if bbox_height == 0: bbox_height = 1
-        if bbox_width == 0: bbox_width = 1
+        if bbox_height == 0:
+            bbox_height = 1
+        if bbox_width == 0:
+            bbox_width = 1
         scale = min(used_width / bbox_width, used_height / bbox_height)
-        offset_x = self.margin_x + (used_width - bbox_width * scale) / 2 - min_x * scale
-        offset_y = self.margin_y + (used_height - bbox_height * scale) / 2 - min_y * scale
-        screen_positions = {zone.name: (zone.coordinates[0] * scale + offset_x, zone.coordinates[1] * scale + offset_y) for zone in list_zones}
+        offset_x = self.margin_x + (
+            used_width - bbox_width * scale
+        ) / 2 - min_x * scale
+        offset_y = self.margin_y + (
+            used_height - bbox_height * scale
+        ) / 2 - min_y * scale
+        screen_positions = {
+            zone.name: (
+                zone.coordinates[0] * scale + offset_x,
+                zone.coordinates[1] * scale + offset_y
+            )
+            for zone in list_zones
+        }
         self._screen_positions = screen_positions
         radius = max(self.min_radius, min(scale * 2, self.max_radius))
         surface = pg.Surface(
@@ -307,12 +323,11 @@ class DroneScreen(BaseScene):
             surface.blit(label, label_rect)
         for name, pos in screen_positions.items():
             pg.draw.circle(surface, colors[name], pos, radius)
-        return surface # TODO: richtig scalen auf die res
+        return surface  # TODO: richtig scalen auf die res
 
     def handle_event(self, event: pg.event.Event) -> None:
         if event.type == pg.KEYDOWN:
             ...
-        
 
     def update_content(self, dt: float) -> None:
         if self._finished:
@@ -328,13 +343,17 @@ class DroneScreen(BaseScene):
         )
 
     def draw_content(self, surface: pg.Surface) -> None:
-        surface.blit(self._static_surface, (0,0))
+        surface.blit(self._static_surface, (0, 0))
         for drone in self.scheduler.drone_list:
             if drone.current_zone is None:
                 continue
-            pg.draw.circle(surface, 'Black', (self._screen_positions[drone.current_zone]), 8)
-        turn_count = self.font.render(str(self.scheduler.current_turn), True, 'White')
-        turn_rect = turn_count.get_rect(topleft=(0,0))
+            pg.draw.circle(
+                surface, 'Black', (
+                    self._screen_positions[drone.current_zone]
+                ), 8)
+        turn_count = self.font.render(
+            str(self.scheduler.current_turn), True, 'White')
+        turn_rect = turn_count.get_rect(topleft=(0, 0))
         surface.blit(turn_count, turn_rect)
 
     def next_scene(self) -> str | None:
@@ -348,8 +367,8 @@ class Visualizer():
         ('src/visual/assets/3.png', 0.5, True),
         ('src/visual/assets/4.png', 0.8, True),
     ]
+
     def __init__(
-        
         self,
         width: int,
         height: int,
@@ -366,10 +385,11 @@ class Visualizer():
         self._font: pg.font.Font | None = None
         self._font_intro: pg.font.Font | None = None
 
-
     def _make_scene(self, name: str) -> Scene:
         background = Background(self.height, self._BACKGROUND_LAYERS)
-        particles = ParticleSystem([Snowflake(self.width, self.height) for _ in range(35)])
+        particles = ParticleSystem(
+            [Snowflake(self.width, self.height) for _ in range(35)]
+        )
         if name == 'intro':
             return IntroScreen(background, particles, self._font_intro)
         if name == 'menu':
@@ -395,7 +415,9 @@ class Visualizer():
     def run(self) -> None:
         pg.init()
         screen = pg.display.set_mode((self.width, self.height))
-        icon_surface = pg.image.load('src/visual/assets/icon_128.png').convert()
+        icon_surface = pg.image.load(
+            'src/visual/assets/icon_128.png'
+        ).convert()
         pg.display.set_icon(icon_surface)
         pg.display.set_caption('Fly-In')
         clock = pg.time.Clock()

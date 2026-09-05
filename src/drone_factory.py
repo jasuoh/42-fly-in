@@ -47,7 +47,7 @@ class Drone():
 class DroneFactory():
     def __init__(self, drone_number: int):
         self.drone_number = drone_number
-        self.drone_list = []
+        self.drone_list: list[Drone] = []
 
     def get_drone_list(self, start_hub: str, path: list[str]) -> None:
         for i in range(0, self.drone_number):
