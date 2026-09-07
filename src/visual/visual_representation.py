@@ -177,8 +177,6 @@ class IntroScreen(BaseScene):
         name_b_rect = name_b.get_rect(topleft=(3, 3))
         name_rect = name.get_rect(topleft=(0, 0))
         rect = label.get_rect(center=(surface.get_width() // 2, surface.get_height() // 3))
-        # only for test case
-
         label_ins = self.font_l.render('Press a key or the mouse to start!', True, 'White')
         rect_ins = label_ins.get_rect(center=(surface.get_width() // 2, surface.get_height() - 100))
         surface.blit(label_ins, rect_ins)
@@ -247,7 +245,8 @@ class Menu(BaseScene):
 class DroneScreen(BaseScene):
     min_radius = 5
     max_radius = 25
-    padding = 10
+    padding_x = 150
+    padding_y = 50
     def __init__(
         self,
         background: Background,
@@ -273,21 +272,35 @@ class DroneScreen(BaseScene):
         self.height = screen_height
         self._screen_positions = None
         self.zone_positions = self._calculate_margin(list_zones)
-        self._static_surface = self._draw_zones_and_connections(
+        self._static_surface = self._draw_static_surface(
             list_zones, list_connections
         )
 
-    def _draw_log(self):
-        ...  # TODO: log pannel on one of the sides
+    def _draw_static_surface(self, list_zones, list_connections):
+        surface = pg.Surface(
+            (self.width, self.height), pg.SRCALPHA
+        )
+        self._draw_zones_and_connections(list_zones, list_connections, surface)
+        self._draw_log(surface)
+        self._draw_legend(surface)
+        return surface
+
+    def _draw_log(self, surface: pg.Surface):
+        pg.draw.rect(surface, 'White', pg.Rect(self.width - 2 * self.padding_x, self.height - 4 * self.padding_y, 2 * self.padding_x - 25, 4 * self.padding_y - 25), 2, 3) # TODO: White rect is there, but now i need to think about how to implement text, like animated or idk
 
     def _draw_infos(self):
         ... # TODO: draw infos for each drone on hover
 
+    def _draw_legend(self, surface: pg.Surface) -> None:
+        label = self.font.render('Space: Pause/unpause Right arrow: next turn', True, 'White')
+        label_rect = label.get_rect(topright=(self.width - 25, 0))
+        surface.blit(label, label_rect)
+
     def _calculate_margin(self, list_zones: list[Zone]):
         max_name_w = max([self.font.size(zone.name)[0] for zone in list_zones])
         name_h = self.font.size(list_zones[0].name)[1]
-        self.margin_x = max(self.max_radius, max_name_w // 2) + self.padding
-        self.margin_y = self.max_radius + name_h + self.padding
+        self.margin_x = max(self.max_radius, max_name_w // 2) + self.padding_x
+        self.margin_y = self.max_radius + name_h + self.padding_y
         return {
             zone.name: (zone.coordinates[0], zone.coordinates[1])
             for zone in list_zones
@@ -297,6 +310,7 @@ class DroneScreen(BaseScene):
         self,
         list_zones: list[Zone],
         list_connections: list[Connection],
+        surface
     ) -> pg.Surface:
         max_x = max(pos[0] for pos in self.zone_positions.values())
         max_y = max(pos[1] for pos in self.zone_positions.values())
@@ -326,27 +340,26 @@ class DroneScreen(BaseScene):
         }
         self._screen_positions = screen_positions
         radius = max(self.min_radius, min(scale * 2, self.max_radius))
-        surface = pg.Surface(
-            (self.width, self.height), pg.SRCALPHA
-        )
-        colors = {zone.name: zone.color or 'Red' for zone in list_zones}
+        colors = {zone.name: zone.color for zone in list_zones}
         for connection in list_connections:
             start = screen_positions[connection.zone_a]
             end = screen_positions[connection.zone_b]
             pg.draw.line(surface, connection.color, start, end, 5)
         for name, pos in screen_positions.items():
-            label = self.font.render(name, True, 'Black') # TODO: scaled fonts
+            label = self.font.render(name, True, 'Black')
             label_rect = label.get_rect(center=(pos[0], pos[1] + 35))
             surface.blit(label, label_rect)
         for name, pos in screen_positions.items():
             pg.draw.circle(surface, colors[name], pos, radius) # TODO: color fix for not right formated colors in map file
-        return surface # TODO: add legend
+        return surface
 
     def handle_event(self, event: pg.event.Event) -> None:
         if event.type == pg.KEYDOWN and event.key == pg.K_RIGHT:
             self._elapsed = self.turn_interval
         elif event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
             self.pause = not self.pause # TODO: Pause Button implementieren
+        elif event.type == pg.MOUSEBUTTONDOWN:
+            ...
         
 
     def update_content(self, dt: float) -> None:
@@ -356,11 +369,12 @@ class DroneScreen(BaseScene):
         if self._elapsed < self.turn_interval:
             return
         self._elapsed = 0.0
-        print(f"Turn: {self.scheduler.current_turn + 1}, Move: {self.scheduler.gen_turn()}\n") # TODO: remove / only debugging
+        self.scheduler.gen_turn()
         self._finished = all(
             drone.current_status == status_type.delivered
             for drone in self.scheduler.drone_list
         )
+        
 
     def draw_content(self, surface: pg.Surface) -> None:
         surface.blit(self._static_surface, (0, 0))
@@ -413,14 +427,13 @@ class MapSelection(BaseScene):
 
         def update_content(self, dt):
             ...
+
         def draw_content(self, surface):
             for index, item in enumerate(self.maps):
                 color = 'Purple' if index == self.target else 'White'
                 label = self.font.render(item.label, True, color)
                 item.rect = label.get_rect(topleft=item.pos)
                 surface.blit(label, item.pos)
-
-
         def next_scene(self):
             return self._chosen
 
@@ -486,8 +499,9 @@ class Visualizer():
         pg.display.set_icon(icon_surface)
         pg.display.set_caption('Fly-In')
         clock = pg.time.Clock()
-        self._font_intro = pg.font.SysFont('consolas', 30)
-        self._font = pg.font.SysFont('consolas', 18)
+        if self._font == None or self._font_intro == None:
+            self._font_intro = pg.font.SysFont('consolas', int(45 * self.height / self.width))
+            self._font = pg.font.SysFont('consolas', int(30 * self.height / self.width))
         self.scenes = [self._make_scene('intro')]
         while True:
             dt = clock.tick(60) / 1000
