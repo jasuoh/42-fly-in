@@ -11,140 +11,13 @@ import pygame as pg
 from abc import ABC, abstractmethod
 
 
-from ..drone_factory import status_type
-from ..input_parsing import Connection, Zone
-from ..simulation_engine import Scheduler
-from ..input_parsing import input_parsing
-from ..pathfinding_algorithm import Map, Graph
-from ..drone_factory import DroneFactory
-
-
-class Particle(ABC):
-    def __init__(self, screen_width: int, screen_height: int) -> None:
-        self.screen_width = screen_width
-        self.screen_height = screen_height
-        self.pos_x: float = random.uniform(0, screen_width)
-        self.pos_y: float = random.uniform(-screen_height, 0)
-        self.speed: float = random.uniform(20.0, 80.0)
-        self.radius: int = random.randrange(2, 6)
-
-    def update(self, dt: float) -> None:
-        self.pos_y += self.speed * dt
-        if self.pos_y >= self.screen_height:
-            self.pos_y = 0
-            self.pos_x = random.uniform(0, self.screen_width)
-
-    @abstractmethod
-    def draw(self, surface: pg.Surface) -> None:
-        ...
-
-
-class Snowflake(Particle):
-    def draw(self, surface: pg.Surface) -> None:
-        pg.draw.circle(
-            surface, 'White', (int(self.pos_x), int(self.pos_y)),
-            self.radius
-        )
-
-
-class ParticleSystem():
-    def __init__(self, particles: list[Particle]) -> None:
-        self.particles = particles
-
-    def update(self, dt: float) -> None:
-        for particle in self.particles:
-            particle.update(dt)
-
-    def draw(self, surface: pg.Surface) -> None:
-        for particle in self.particles:
-            particle.draw(surface)
-
-
-class Background():
-    class _Layer():
-        def __init__(self, image: pg.Surface, speed: float) -> None:
-            self.image = image
-            self.speed = speed
-            self.scroll: float = 0.0
-
-    def __init__(
-        self,
-        height: int,
-        layer_specs: list[tuple[str, float, bool]],
-    ) -> None:
-        self.layers = [
-            self._Layer(self._load_img(path, height, has_alpha), speed)
-            for path, speed, has_alpha in layer_specs
-        ]
-
-    @staticmethod
-    def _load_img(
-        path: str, height: int, has_alpha: bool
-    ) -> pg.Surface:
-        scale = 1.5
-        image = (
-            pg.image.load(path).convert_alpha() if has_alpha
-            else pg.image.load(path).convert()
-        )
-        ratio = height / image.get_height()
-        new_width = int(image.get_width() * ratio)
-        new_size = (int(new_width * scale), int(height * scale))
-        return pg.transform.scale(image, new_size)
-
-    def update(self, dt: float) -> None:
-        for layer in self.layers:
-            layer.scroll += layer.speed * dt * 60
-            if layer.scroll >= layer.image.get_width():
-                layer.scroll = 0
-
-    def draw(self, surface: pg.Surface) -> None:
-        for layer in self.layers:
-            width = layer.image.get_width()
-            surface.blit(layer.image, (layer.scroll, -200))
-            surface.blit(layer.image, (layer.scroll - width, -200))
-
-
-class Scene(ABC):
-    @abstractmethod
-    def handle_event(self, event: pg.event.Event) -> None:
-        ...
-
-    @abstractmethod
-    def update(self, dt: float) -> None:
-        ...
-
-    @abstractmethod
-    def draw(self, surface: pg.Surface) -> None:
-        ...
-
-    def next_scene(self) -> str | None:
-        return None
-
-
-class BaseScene(Scene):
-    def __init__(
-        self, background: Background, particles: ParticleSystem
-    ) -> None:
-        self.background = background
-        self.particles = particles
-
-    def update(self, dt: float) -> None:
-        self.background.update(dt)
-        self.particles.update(dt)
-        self.update_content(dt)
-
-    def draw(self, surface: pg.Surface) -> None:
-        self.background.draw(surface)
-        self.particles.draw(surface)
-        self.draw_content(surface)
-
-    @abstractmethod
-    def update_content(self, dt: float) -> None:
-        ...
-
-    @abstractmethod
-    def draw_content(self, surface: pg.Surface) -> None:
-        ...
+from .drone_factory import status_type
+from .input_parsing import Connection, Zone
+from .simulation_engine import Scheduler
+from .input_parsing import input_parsing
+from .pathfinding_algorithm import Map, Graph
+from .drone_factory import DroneFactory
+from .visual import BaseScene, ParticleSystem, Background, Snowflake, Scene
 
 
 class IntroScreen(BaseScene):
@@ -513,9 +386,6 @@ class Visualizer():
         raise ValueError(f'Unknown scene: {name}')
 
     def run(self) -> None:
-
-
-
         pg.init()
         screen = pg.display.set_mode((self.width, self.height), pg.RESIZABLE | pg.SCALED)
         screen.fill('White')
@@ -523,19 +393,14 @@ class Visualizer():
         pg.display.set_icon(icon_surface)
         pg.display.set_caption('Fly-In')
         clock = pg.time.Clock()
-
-
         if self._font == None or self._font_intro == None:
             self._font_intro = pg.font.SysFont('consolas', int(45 * self.height / self.width))
             self._font = pg.font.SysFont('consolas', int(30 * self.height / self.width))
-
-
-        
         self.scenes = [self._make_scene('intro')]
         while True:
             dt = clock.tick(60) / 1000
             if isinstance(self.scenes[-1], tuple):
-                current, scheduler, config = self.scenes[-1]
+                current,_,_ = self.scenes[-1]
             else:
                 current = self.scenes[-1]
             for event in pg.event.get():

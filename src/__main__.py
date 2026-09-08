@@ -5,7 +5,7 @@ from .argparsing import ArgParsing
 from .pathfinding_algorithm import Map, Graph
 from .drone_factory import DroneFactory
 from .simulation_engine import Scheduler
-from .visual.visual_representation import Visualizer
+from .visual_representation import Visualizer
 
 
 def main() -> None:
