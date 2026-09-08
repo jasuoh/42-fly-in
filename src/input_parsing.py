@@ -65,20 +65,15 @@ class Config_Map():
         self.connections = None
         self._value_dict = None
 
-    def _input_parsing_and_error_handling(self) -> None:
+    def _input_parsing_and_error_handling(self, path: str) -> None:
         allowed_keys = [
             "nb_drones", "start_hub", "end_hub", "hub", "connection"
         ]
-        argument_parser = argparse.ArgumentParser(description="CLI for Fly-In")
-        argument_parser.add_argument(
-            "--map", default="maps/easy/01_linear_path.txt", dest="maps"
-        )
-        args = argument_parser.parse_args()
         value_dict: Dict = {}
         value_dict["hub"] = []
         value_dict["connection"] = []
         try:
-            with open(args.maps) as f:
+            with open(path) as f:
                 data = f.read()
             for line in data.splitlines():
                 if not line or line.startswith("#"):
@@ -183,10 +178,10 @@ class Config_Map():
         ...  # TODO: validation for map file after checking each line
 
 
-def input_parsing():
+def input_parsing(path: str):
     config = Config_Map()
     try:
-        config._input_parsing_and_error_handling()
+        config._input_parsing_and_error_handling(path=path)
         config._assign_dict_to_obj()
     except BaseException as e:
         print(e)

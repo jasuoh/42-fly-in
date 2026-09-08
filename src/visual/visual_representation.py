@@ -14,6 +14,9 @@ from abc import ABC, abstractmethod
 from ..drone_factory import status_type
 from ..input_parsing import Connection, Zone
 from ..simulation_engine import Scheduler
+from ..input_parsing import input_parsing
+from ..pathfinding_algorithm import Map, Graph
+from ..drone_factory import DroneFactory
 
 
 class Particle(ABC):
@@ -350,7 +353,7 @@ class DroneScreen(BaseScene):
             label_rect = label.get_rect(center=(pos[0], pos[1] + 35))
             surface.blit(label, label_rect)
         for name, pos in screen_positions.items():
-            pg.draw.circle(surface, colors[name] if colors[name] in pg.color.THECOLORS else 'Red', pos, radius) # TODO: color fix for not right formated colors in map file
+            pg.draw.circle(surface, colors[name] if colors[name] in pg.color.THECOLORS else 'Red', pos, radius)
         return surface
 
     def handle_event(self, event: pg.event.Event) -> None:
@@ -387,17 +390,21 @@ class DroneScreen(BaseScene):
         surface.blit(turn_count, turn_rect)
 
     def next_scene(self) -> str | None:
-        return 'menu' if self._finished else None
+        if self._finished and self.scheduler:
+            return 'menu'
+        elif self._finished and not self.scheduler:
+            return 'map'
+        else:
+            return None
 
 class MapItem():
-    def __init__(self, label, path, pos, target):
+    def __init__(self, label: str, path: str, pos: tuple, target: str = 'drone'):
         self.label = label
         self.path = path
         self.pos = pos
         self.target = target
 
 class MapSelection(BaseScene):
-        # TODO: Map Selection Szene for all the different szenes
         def __init__(self, background, particles, avaiable_maps: list[MapItem], offset_x, offset_y, scale, font):
             self.target = 0
             self.maps = avaiable_maps
@@ -419,11 +426,11 @@ class MapSelection(BaseScene):
                     self._chosen = item.target
             elif event.type == pg.KEYDOWN:
                 if event.key == pg.K_DOWN:
-                    self.target = (self.target + 1) % len(self.items)
+                    self.target = (self.target + 1) % len(self.maps)
                 elif event.key == pg.K_UP:
-                    self.target = (self.target - 1) % len(self.items)
+                    self.target = (self.target - 1) % len(self.maps)
                 elif event.key == pg.K_RETURN:
-                    self._chosen = self.maps[self.target].target
+                    self._chosen = self.maps[self.target]
 
         def update_content(self, dt):
             ...
@@ -433,9 +440,18 @@ class MapSelection(BaseScene):
                 color = 'Purple' if index == self.target else 'White'
                 label = self.font.render(item.label, True, color)
                 item.rect = label.get_rect(topleft=item.pos)
-                surface.blit(label, item.pos)
+                surface.blit(label, item.pos) # TODO: Box um das label
+
         def next_scene(self):
-            return self._chosen
+            if self._chosen is None:
+                return None
+            config = input_parsing(self._chosen.path)
+            map = Map.from_config(config)
+            graph = Graph(map)
+            F = DroneFactory(int(config.nb_drones))
+            _, predecessors = graph.shortest_distance(config.start)
+            F.get_drone_list(start_hub=config.start, path=graph.shortest_path(config.start, config.end, predecessors))
+            return (self._chosen.target, Scheduler(map, graph, F.drone_list, config), config)
 
 
 class Visualizer():
@@ -450,18 +466,19 @@ class Visualizer():
         self,
         list_zones: list[Zone],
         list_connections: list[Connection],
-        scheduler: Scheduler,
+        scheduler: Scheduler | None = None
     ) -> None:
         self.width = 1200
         self.height = 800
         self.list_zones = list_zones
         self.list_connections = list_connections
         self.scheduler = scheduler
-        self.scenes: list[Scene] = []
+        self.scenes: list[tuple[Scene, Scheduler]] = []
         self._font: pg.font.Font | None = None
         self._font_intro: pg.font.Font | None = None
 
-    def _make_scene(self, name: str) -> Scene:
+
+    def _make_scene(self, name: str, scheduler=None, config=None) -> Scene:
         background = Background(self.height, self._BACKGROUND_LAYERS)
         particles = ParticleSystem(
             [Snowflake(self.width, self.height) for _ in range(35)]
@@ -470,7 +487,7 @@ class Visualizer():
             return IntroScreen(background, particles, self._font_intro, self._font)
         if name == 'menu':
             items = [
-                MenuItem('start', (self.width // 5, 150), 'map'),
+                MenuItem('start', (self.width // 5, 150), 'map' if self.scheduler is None else 'drone'),
                 MenuItem('back', (self.width // 5, 200), 'intro'),
                 MenuItem('quit', (self.width // 5, 250), 'quit')
             ]
@@ -480,18 +497,25 @@ class Visualizer():
                 background,
                 particles,
                 self._font,
-                self.list_zones,
-                self.list_connections,
-                self.scheduler,
+                self.list_zones if self.list_zones is not None else config.zones,
+                self.list_connections if self.list_connections is not None else config.connections,
+                self.scheduler if self.scheduler is not None else scheduler,
                 self.width,
                 self.height
             )
         if name == 'map':
-            items = [MapItem('map1', None, (self.width // 2, 100), 'drone'),]
+            items = [
+                MapItem('Map 01: Linear Path', './maps/easy/01_linear_path.txt', (self.width // 3, 50), 'drone'),
+                MapItem('Map 02: Simple Fork', './maps/easy/02_simple_fork.txt', (self.width // 3, 100), 'drone'),
+                MapItem('Map 03: Basic Capacity', './maps/easy/03_basic_capacity.txt', (self.width // 3, 150), 'drone')
+            ]
             return MapSelection(background, particles, items, None, None, None, self._font)
         raise ValueError(f'Unknown scene: {name}')
 
     def run(self) -> None:
+
+
+
         pg.init()
         screen = pg.display.set_mode((self.width, self.height), pg.RESIZABLE | pg.SCALED)
         screen.fill('White')
@@ -499,13 +523,21 @@ class Visualizer():
         pg.display.set_icon(icon_surface)
         pg.display.set_caption('Fly-In')
         clock = pg.time.Clock()
+
+
         if self._font == None or self._font_intro == None:
             self._font_intro = pg.font.SysFont('consolas', int(45 * self.height / self.width))
             self._font = pg.font.SysFont('consolas', int(30 * self.height / self.width))
+
+
+        
         self.scenes = [self._make_scene('intro')]
         while True:
             dt = clock.tick(60) / 1000
-            current = self.scenes[-1]
+            if isinstance(self.scenes[-1], tuple):
+                current, scheduler, config = self.scenes[-1]
+            else:
+                current = self.scenes[-1]
             for event in pg.event.get():
                 if event.type == pg.QUIT:
                     pg.quit()
@@ -525,4 +557,7 @@ class Visualizer():
                 pg.quit()
                 sys.exit()
             elif target:
-                self.scenes.append(self._make_scene(target))
+                if isinstance(target, tuple):
+                    self.scenes.append(self._make_scene(target[0], target[1], target[2]))
+                else:
+                    self.scenes.append(self._make_scene(target))
