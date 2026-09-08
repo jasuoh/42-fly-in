@@ -257,7 +257,7 @@ class DroneScreen(BaseScene):
         scheduler: Scheduler,
         screen_width: int,
         screen_height: int,
-        turn_interval: float = 1
+        turn_interval: float = 2
     ) -> None:
         super().__init__(background, particles)
         self.font = font
@@ -350,7 +350,7 @@ class DroneScreen(BaseScene):
             label_rect = label.get_rect(center=(pos[0], pos[1] + 35))
             surface.blit(label, label_rect)
         for name, pos in screen_positions.items():
-            pg.draw.circle(surface, colors[name], pos, radius) # TODO: color fix for not right formated colors in map file
+            pg.draw.circle(surface, colors[name] if colors[name] in pg.color.THECOLORS else 'Red', pos, radius) # TODO: color fix for not right formated colors in map file
         return surface
 
     def handle_event(self, event: pg.event.Event) -> None:
