@@ -1,16 +1,8 @@
 #! /usr/bin/env python3
 
-'''
-Visual Representation of the drone network
-'''
 
-
-import random
 import sys
 import pygame as pg
-from abc import ABC, abstractmethod
-
-
 from .drone_factory import status_type
 from .input_parsing import Connection, Zone
 from .simulation_engine import Scheduler
