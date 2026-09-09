@@ -386,7 +386,13 @@ class Visualizer():
             items = [
                 MapItem('Map 01: Linear Path', './maps/easy/01_linear_path.txt', (self.width // 3, 50), 'drone'),
                 MapItem('Map 02: Simple Fork', './maps/easy/02_simple_fork.txt', (self.width // 3, 100), 'drone'),
-                MapItem('Map 03: Basic Capacity', './maps/easy/03_basic_capacity.txt', (self.width // 3, 150), 'drone')
+                MapItem('Map 03: Basic Capacity', './maps/easy/03_basic_capacity.txt', (self.width // 3, 150), 'drone'),
+                MapItem('Map 04: Dead End Trap', './maps/medium/01_dead_end_trap.txt', (self.width // 3, 200), 'drone'),
+                MapItem('Map 05: Connection Check', './maps/medium/02_connection_checktxt', (self.width // 3, 250), 'drone'),
+                MapItem('Map 06: Priority Puzzle', './maps/medium/03_priority_puzzle.txt', (self.width // 3, 300), 'drone'),
+                MapItem('Map 07: Maze Nightmare', './maps/hard/01_maze_nightmare.txt', (self.width // 3, 350), 'drone'),
+                MapItem('Map 08: Capacity Hell', './maps/hard/02_capacity_hell.txt', (self.width // 3, 400), 'drone'),
+                MapItem('Map 09: Dead End Trap', './maps/hard/03_ultimate_challenge', (self.width // 3, 450), 'drone'),
             ]
             return MapSelection(background, particles, items, None, None, None, self._font)
         raise ValueError(f'Unknown scene: {name}')
@@ -400,8 +406,8 @@ class Visualizer():
         pg.display.set_caption('Fly-In')
         clock = pg.time.Clock()
         if self._font == None or self._font_intro == None:
-            self._font_intro = pg.font.SysFont('consolas', int(45 * self.height / self.width))
-            self._font = pg.font.SysFont('consolas', int(30 * self.height / self.width))
+            self._font_intro = pg.font.Font('src/visual/assets/font.ttf', int(45 * self.height / self.width))
+            self._font = pg.font.Font('src/visual/assets/font.ttf', int(30 * self.height / self.width))
         self.scenes = [self._make_scene('intro')]
         while True:
             dt = clock.tick(60) / 1000
