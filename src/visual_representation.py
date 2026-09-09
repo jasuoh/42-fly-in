@@ -136,6 +136,7 @@ class DroneScreen(BaseScene):
         self.margin_x = None
         self.margin_y = None
         self.pause = False
+        self.current_turn = None
         self.width = screen_width
         self.height = screen_height
         self._screen_positions = None
@@ -154,8 +155,8 @@ class DroneScreen(BaseScene):
         return surface
 
     def _draw_log(self, surface: pg.Surface):
-        pg.draw.rect(surface, 'White', pg.Rect(self.width - 2 * self.padding_x, self.height - 4 * self.padding_y, 2 * self.padding_x - 25, 4 * self.padding_y - 25), 2, 3) # TODO: White rect is there, but now i need to think about how to implement text, like animated or idk
-
+        pg.draw.rect(surface, 'White', pg.Rect(self.width - 2 * self.padding_x, self.height - 4 * self.padding_y, 2 * self.padding_x - 25, 4 * self.padding_y - 25), 2, 3)
+        
     def _draw_infos(self):
         ... # TODO: draw infos for each drone on hover
 
@@ -237,7 +238,7 @@ class DroneScreen(BaseScene):
         if self._elapsed < self.turn_interval:
             return
         self._elapsed = 0.0
-        self.scheduler.gen_turn()
+        self.current_turn = self.scheduler.gen_turn()
         self._finished = all(
             drone.current_status == status_type.delivered
             for drone in self.scheduler.drone_list
@@ -253,8 +254,17 @@ class DroneScreen(BaseScene):
         turn_count = self.font.render(f"Turn: {str(self.scheduler.current_turn)}", True, 'White')
         turn_rect = turn_count.get_rect(topleft=(0,0))
         surface.blit(turn_count, turn_rect)
+        x = 0
+        label_surface = pg.Surface((2 * self.padding_x - 25, 4 * self.padding_y - 25), pg.SRCALPHA)
+        if self.current_turn is not None:
+            for turn in self.current_turn.split(' '):
+                label = self.font.render(turn, True, 'White')
+                label_rect = label.get_rect(topleft=(5, x))
+                x += 25
+                label_surface.blit(label, label_rect)
+            surface.blit(label_surface, (self.width - 2 * self.padding_x, self.height - 4 * self.padding_y))
 
-    def next_scene(self) -> str | None:
+    def next_scene(self) -> str | None: 
         if self._finished and self.scheduler:
             return 'menu'
         elif self._finished and not self.scheduler:
