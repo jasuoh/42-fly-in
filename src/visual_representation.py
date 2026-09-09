@@ -136,6 +136,7 @@ class DroneScreen(BaseScene):
         self.margin_x = None
         self.margin_y = None
         self.pause = False
+        self.end = False
         self.current_turn = None
         self.width = screen_width
         self.height = screen_height
@@ -225,14 +226,17 @@ class DroneScreen(BaseScene):
     def handle_event(self, event: pg.event.Event) -> None:
         if event.type == pg.KEYDOWN and event.key == pg.K_RIGHT:
             self._elapsed = self.turn_interval
-        elif event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
-            self.pause = not self.pause # TODO: Pause Button implementieren
+        elif event.type == pg.KEYDOWN:
+            if event.key == pg.K_SPACE:
+                self.pause = not self.pause # TODO: Pause Button implementieren
+            elif event.key == pg.K_e and self._finished:
+                self.end = True
         elif event.type == pg.MOUSEBUTTONDOWN:
             ...
         
 
     def update_content(self, dt: float) -> None:
-        if self._finished or self.pause:
+        if self.end or self.pause:
             return
         self._elapsed += dt
         if self._elapsed < self.turn_interval:
@@ -243,6 +247,8 @@ class DroneScreen(BaseScene):
             drone.current_status == status_type.delivered
             for drone in self.scheduler.drone_list
         )
+        if not self._finished:
+            print(self.current_turn)
         
 
     def draw_content(self, surface: pg.Surface) -> None:
@@ -265,10 +271,8 @@ class DroneScreen(BaseScene):
             surface.blit(label_surface, (self.width - 2 * self.padding_x, self.height - 4 * self.padding_y))
 
     def next_scene(self) -> str | None: 
-        if self._finished and self.scheduler:
+        if self.end and self.scheduler:
             return 'menu'
-        elif self._finished and not self.scheduler:
-            return 'map'
         else:
             return None
 
@@ -315,7 +319,7 @@ class MapSelection(BaseScene):
                 color = 'Purple' if index == self.target else 'White'
                 label = self.font.render(item.label, True, color)
                 item.rect = label.get_rect(topleft=item.pos)
-                surface.blit(label, item.pos) # TODO: Box um das label
+                surface.blit(label, item.pos)
 
         def next_scene(self):
             if self._chosen is None:
