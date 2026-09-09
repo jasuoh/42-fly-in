@@ -12,11 +12,11 @@ class Scene(ABC):
 
     @abstractmethod
     def update(self, dt: float) -> None:
-        ...
+        pass
 
     @abstractmethod
     def draw(self, surface: pg.Surface) -> None:
-        ...
+        pass
 
     def next_scene(self) -> str | None:
         return None
@@ -41,8 +41,8 @@ class BaseScene(Scene):
 
     @abstractmethod
     def update_content(self, dt: float) -> None:
-        ...
+        pass
 
     @abstractmethod
     def draw_content(self, surface: pg.Surface) -> None:
-        ...
+        pass
