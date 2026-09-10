@@ -111,8 +111,8 @@ class Menu(BaseScene):
 
 
 class DroneScreen(BaseScene):
-    min_radius = 5
-    max_radius = 25
+    min_scalling = 5
+    max_scalling = 35
     padding_x = 150
     padding_y = 50
     def __init__(
@@ -173,8 +173,8 @@ class DroneScreen(BaseScene):
     def _calculate_margin(self, list_zones: list[Zone]):
         max_name_w = max([self.font.size(zone.name)[0] for zone in list_zones])
         name_h = self.font.size(list_zones[0].name)[1]
-        self.margin_x = max(self.max_radius, max_name_w // 2) + self.padding_x
-        self.margin_y = self.max_radius + name_h + self.padding_y
+        self.margin_x = max(self.max_scalling, max_name_w // 2) + self.padding_x
+        self.margin_y = self.max_scalling + name_h + self.padding_y
         return {
             zone.name: (zone.coordinates[0], zone.coordinates[1])
             for zone in list_zones
@@ -214,28 +214,30 @@ class DroneScreen(BaseScene):
             for zone in list_zones
         }
         self._screen_positions = screen_positions
-        radius = max(self.min_radius, min(scale * 2, self.max_radius))
+        scalling = max(self.min_scalling, min(scale * 2, self.max_scalling))
         colors = {zone.name: zone.color for zone in list_zones}
         for connection in list_connections:
             start = screen_positions[connection.zone_a]
             end = screen_positions[connection.zone_b]
-            pg.draw.line(surface, connection.color, start, end, 5)
+            pg.draw.line(surface, connection.color, start, end, 3)
         for name, pos in screen_positions.items():
             label = self.font.render(name, True, 'Black')
             label_rect = label.get_rect(center=(pos[0], pos[1] + 50))
             surface.blit(label, label_rect)
         for name, pos in screen_positions.items():
             s = self.tint(zone_png, colors[name])
-            print(colors[name])
             rect = s.get_rect(center=pos)
             surface.blit(s, rect)
         return surface
 
-    @staticmethod
-    def tint(surface, color):
+    def tint(self, surface, color):
         color = pg.Color(color)
         s = surface.copy()
         s.fill(color, special_flags=pg.BLEND_RGBA_MULT)
+        # ratio = self.height / s.get_height()
+        # new_width = int(s.get_width() * ratio)
+        # new_size = (int(new_width * scalling), int(self.height * scalling))
+        # return pg.transform.scale(s, new_size)
         return s
 
     def handle_event(self, event: pg.event.Event) -> None:
@@ -243,7 +245,7 @@ class DroneScreen(BaseScene):
             self._elapsed = self.turn_interval
         elif event.type == pg.KEYDOWN:
             if event.key == pg.K_SPACE:
-                self.pause = not self.pause # TODO: Pause Button implementieren
+                self.pause = not self.pause
             elif event.key == pg.K_e and self._finished:
                 self.end = True
         elif event.type == pg.MOUSEBUTTONDOWN:

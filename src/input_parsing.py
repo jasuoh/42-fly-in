@@ -36,7 +36,7 @@ class Connection(BaseModel):
     zone_a: str = Field(...)
     zone_b: str = Field(...)
     max_link_capacity: int | None = Field(default=None, ge=0)
-    color: str = Field(default='Green')
+    color: str = Field(default='White')
 
 
 class Zone(BaseModel):
