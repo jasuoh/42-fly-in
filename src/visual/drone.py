@@ -8,7 +8,7 @@ class Drone_System():
             self,
             png_specs,
             height,
-            frame_duration: float = 0.1
+            frame_duration: float = 0.08
         ):
         self.drone_images = [
             self._load_img(path, height) for path in png_specs
