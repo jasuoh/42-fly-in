@@ -4,8 +4,15 @@ import pygame as pg
 
 
 class Drone_System():
-    def __init__(self):
-        self.drone_image = self.get_drone_image()
+    def __init__(
+            self,
+            png_specs,
+            height
+        ):
+        self.current_drone_image = None
+        self.drone_images = [
+            self._load_img(path, height) for path in png_specs
+        ]
 
     @staticmethod
     def _load_img(path: str, height):
@@ -16,9 +23,11 @@ class Drone_System():
         new_size = (int(new_width * scale), int(height * scale))
         return pg.transform.scale(image, new_size)
 
-    def get_drone_image(self):
-        return self._load_img('src/visual/assets/drone/drone.png', 1080)
 
     def print_drone_img(self,surface, pos):
-        rect = self.drone_image.get_rect(center=pos)
-        surface.blit(self.drone_image, rect)
+        rect = self.current_drone_image.get_rect(center=pos)
+        surface.blit(self.current_drone_image, rect)
+
+
+    def animate_drone_img(self, surface, pos, drone):
+        ...

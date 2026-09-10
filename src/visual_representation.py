@@ -141,7 +141,7 @@ class DroneScreen(BaseScene):
         self.current_turn = None
         self.width = screen_width
         self.height = screen_height
-        self.drone = dronesystem
+        self.dronesystem = dronesystem
         self._screen_positions = None
         self.zone_positions = self._calculate_margin(list_zones)
         self._static_surface = self._draw_static_surface(
@@ -238,6 +238,7 @@ class DroneScreen(BaseScene):
         
 
     def update_content(self, dt: float) -> None:
+        self.dronesystem.current_drone_image = self.dronesystem.drone_images[0]
         if self.end or self.pause:
             return
         self._elapsed += dt
@@ -258,8 +259,7 @@ class DroneScreen(BaseScene):
         for drone in self.scheduler.drone_list:
             if drone.current_zone is None:
                 continue
-            # pg.draw.circle(surface, 'Black', (self._screen_positions[drone.current_zone]), 8)
-            self.drone.print_drone_img(surface, self._screen_positions[drone.current_zone])
+            self.dronesystem.print_drone_img(surface, self._screen_positions[drone.current_zone])
         turn_count = self.font.render(f"Turn: {str(self.scheduler.current_turn)}", True, 'White')
         turn_rect = turn_count.get_rect(topleft=(0,0))
         surface.blit(turn_count, turn_rect)
@@ -344,6 +344,11 @@ class Visualizer():
         ('src/visual/assets/background/4.png', 0.8, True),
     ]
 
+    _Drone_layers: list[str] = [
+        'src/visual/assets/drone/drone_move_0.png',
+        'src/visual/assets/drone/drone_move_1.png',
+    ]
+
     def __init__(
         self,
         list_zones: list[Zone],
@@ -365,6 +370,7 @@ class Visualizer():
         particles = ParticleSystem(
             [Snowflake(self.width, self.height) for _ in range(35)]
         )
+        drone_system = Drone_System(self._Drone_layers, self.height)
         if name == 'intro':
             return IntroScreen(background, particles, self._font_intro, self._font)
         if name == 'menu':
@@ -384,7 +390,7 @@ class Visualizer():
                 self.scheduler if self.scheduler is not None else scheduler,
                 self.width,
                 self.height,
-                Drone_System()
+                drone_system
             )
         if name == 'map':
             items = [

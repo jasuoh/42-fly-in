@@ -100,7 +100,8 @@ class Scheduler():
                 self.in_flight[drone.drone_id] = (
                     link, next_zone_name, self.current_turn + 1
                 )
-                drone.start_transit()
+                drone.last_zones.append(drone.start_transit())
+                print(drone.last_zones)
                 link_usage[link] = link_usage.get(link, 0) + 1
                 moves.append(f"D{drone.drone_id}-{source}-{next_zone_name}")
             else:
