@@ -147,6 +147,8 @@ class DroneScreen(BaseScene):
         self._static_surface = self._draw_static_surface(
             list_zones, list_connections
         )
+        self._prev_positions = self._capture_positions()
+        self._target_positions = self._prev_positions
 
     def _draw_static_surface(self, list_zones, list_connections):
         surface = pg.Surface(
@@ -184,6 +186,7 @@ class DroneScreen(BaseScene):
         list_connections: list[Connection],
         surface
     ) -> pg.Surface:
+        zone_png = pg.image.load('src/visual/assets/zone/zone.png').convert_alpha()
         max_x = max(pos[0] for pos in self.zone_positions.values())
         max_y = max(pos[1] for pos in self.zone_positions.values())
         min_x = min(pos[0] for pos in self.zone_positions.values())
@@ -222,8 +225,18 @@ class DroneScreen(BaseScene):
             label_rect = label.get_rect(center=(pos[0], pos[1] + 50))
             surface.blit(label, label_rect)
         for name, pos in screen_positions.items():
-            pg.draw.circle(surface, colors[name] if colors[name] in pg.color.THECOLORS else 'Red', pos, radius)
+            s = self.tint(zone_png, colors[name])
+            print(colors[name])
+            rect = s.get_rect(center=pos)
+            surface.blit(s, rect)
         return surface
+
+    @staticmethod
+    def tint(surface, color):
+        color = pg.Color(color)
+        s = surface.copy()
+        s.fill(color, special_flags=pg.BLEND_RGBA_MULT)
+        return s
 
     def handle_event(self, event: pg.event.Event) -> None:
         if event.type == pg.KEYDOWN and event.key == pg.K_RIGHT:
@@ -238,14 +251,16 @@ class DroneScreen(BaseScene):
         
 
     def update_content(self, dt: float) -> None:
-        self.dronesystem.current_drone_image = self.dronesystem.drone_images[0]
         if self.end or self.pause:
             return
+        self.dronesystem.update(dt)
         self._elapsed += dt
         if self._elapsed < self.turn_interval:
             return
         self._elapsed = 0.0
+        self._prev_positions = self._capture_positions()
         self.current_turn = self.scheduler.gen_turn()
+        self._target_positions = self._capture_positions()
         self._finished = all(
             drone.current_status == status_type.delivered
             for drone in self.scheduler.drone_list
@@ -254,12 +269,43 @@ class DroneScreen(BaseScene):
             print(self.current_turn)
         
 
+    def _final_zone_pos(self, drone) -> tuple[float, float] | None:
+        if drone.current_zone is not None:
+            return self._screen_positions[drone.current_zone]
+        in_flight = self.scheduler.in_flight.get(drone.drone_id)
+        if in_flight is None:
+            return None
+        _, destination, _ = in_flight
+        return self._screen_positions[destination]
+
+    def _capture_positions(self) -> dict[int, tuple[float, float]]:
+        if self._screen_positions is None:
+            return {}
+        positions = {}
+        for drone in self.scheduler.drone_list:
+            pos = self._final_zone_pos(drone)
+            if pos is not None:
+                positions[drone.drone_id] = pos
+        return positions
+
+    def _drone_screen_pos(self, drone) -> tuple[float, float] | None:
+        target = self._target_positions.get(drone.drone_id)
+        if target is None:
+            return self._final_zone_pos(drone)
+        origin = self._prev_positions.get(drone.drone_id, target)
+        progress = min(1.0, self._elapsed / self.turn_interval)
+        return (
+            origin[0] + (target[0] - origin[0]) * progress,
+            origin[1] + (target[1] - origin[1]) * progress,
+        )
+
     def draw_content(self, surface: pg.Surface) -> None:
         surface.blit(self._static_surface, (0, 0))
         for drone in self.scheduler.drone_list:
-            if drone.current_zone is None:
+            pos = self._drone_screen_pos(drone)
+            if pos is None:
                 continue
-            self.dronesystem.print_drone_img(surface, self._screen_positions[drone.current_zone])
+            self.dronesystem.print_drone_img(surface, pos)
         turn_count = self.font.render(f"Turn: {str(self.scheduler.current_turn)}", True, 'White')
         turn_rect = turn_count.get_rect(topleft=(0,0))
         surface.blit(turn_count, turn_rect)
@@ -345,8 +391,7 @@ class Visualizer():
     ]
 
     _Drone_layers: list[str] = [
-        'src/visual/assets/drone/drone_move_0.png',
-        'src/visual/assets/drone/drone_move_1.png',
+        f'src/visual/assets/drone/drone_move_{i}.png' for i in range(6)
     ]
 
     def __init__(
