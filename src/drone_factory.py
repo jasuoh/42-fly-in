@@ -12,6 +12,7 @@ class Drone():
     def __init__(self, drone_id: int, zone: str, path: list[str]):
         self.drone_id: int = drone_id
         self.current_zone: str | None = zone
+        self.last_zones: list = ['start_hub']
         self.current_path: list[str] = path
         self.current_status: status_type = (
             status_type.delivered if not path else status_type.can_move
