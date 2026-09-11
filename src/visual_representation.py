@@ -445,7 +445,7 @@ class Visualizer():
                 MapItem('Map 02: Simple Fork', './maps/easy/02_simple_fork.txt', (self.width // 8, 100), 'drone'),
                 MapItem('Map 03: Basic Capacity', './maps/easy/03_basic_capacity.txt', (self.width // 8, 150), 'drone'),
                 MapItem('Map 04: Dead End Trap', './maps/medium/01_dead_end_trap.txt', (self.width // 8, 200), 'drone'),
-                MapItem('Map 05: Connection Check', './maps/medium/02_connection_checktxt', (self.width // 8, 250), 'drone'),
+                MapItem('Map 05: Circular Loop', './maps/medium/02_circular_loop.txt', (self.width // 8, 250), 'drone'),
                 MapItem('Map 06: Priority Puzzle', './maps/medium/03_priority_puzzle.txt', (self.width // 8, 300), 'drone'),
                 MapItem('Map 07: Maze Nightmare', './maps/hard/01_maze_nightmare.txt', (self.width // 8, 350), 'drone'),
                 MapItem('Map 08: Capacity Hell', './maps/hard/02_capacity_hell.txt', (self.width // 8, 400), 'drone'),
