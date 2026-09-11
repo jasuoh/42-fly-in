@@ -398,12 +398,14 @@ class Visualizer():
 
     def __init__(
         self,
+        width,
+        height,
         list_zones: list[Zone],
         list_connections: list[Connection],
         scheduler: Scheduler | None = None
     ) -> None:
-        self.width = 1920
-        self.height = 1080
+        self.width = width
+        self.height = height
         self.list_zones = list_zones
         self.list_connections = list_connections
         self.scheduler = scheduler
