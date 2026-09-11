@@ -1,6 +1,5 @@
 #! /usr/bin/env python3
 
-import argparse
 from typing import Dict
 from pydantic import BaseModel, Field, ValidationError
 from enum import Enum

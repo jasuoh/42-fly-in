@@ -5,6 +5,7 @@ from .background import Background
 from .particle import ParticleSystem
 import pygame as pg
 
+
 class Scene(ABC):
     @abstractmethod
     def handle_event(self, event: pg.event.Event) -> None:

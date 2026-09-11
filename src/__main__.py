@@ -27,11 +27,15 @@ def main() -> None:
                 predecessors=predecessors)
         )
     if readed_path == 'maps/easy/01_linear_path.txt':
-        Visualizer(0.75 * width, 0.75 * height, None, None).run()
+        Visualizer(
+            0.75 * width, 0.75 * height, None, None
+        ).run()
     else:
         S = Scheduler(map=map, graph=G, drone_list=F.drone_list, config=config)
-        Visualizer(0.75 * width, 0.75 * height, config.zones, config.connections, S).run()
-    
+        Visualizer(
+            0.75 * width, 0.75 * height, config.zones, config.connections, S
+        ).run()
+
 
 if __name__ == "__main__":
     main()

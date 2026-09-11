@@ -9,7 +9,10 @@ from .simulation_engine import Scheduler
 from .input_parsing import input_parsing
 from .pathfinding_algorithm import Map, Graph
 from .drone_factory import DroneFactory
-from .visual import BaseScene, ParticleSystem, Background, Snowflake, Scene, Drone_System
+from .visual import (
+    BaseScene, ParticleSystem,
+    Background, Snowflake, Scene, Drone_System
+)
 
 
 class IntroScreen(BaseScene):
@@ -39,14 +42,24 @@ class IntroScreen(BaseScene):
     def draw_content(self, surface: pg.Surface) -> None:
         label = self.font.render('Fly-In', True, 'White')
         label_b = self.font.render('Fly-In', True, 'mediumpurple1')
-        rect_b = label_b.get_rect(center=(surface.get_width() // 2 + 3, surface.get_height() // 3 + 3))
+        rect_b = label_b.get_rect(
+            center=(
+                surface.get_width() // 2 + 3, surface.get_height() // 3 + 3
+            )
+        )
         name = self.font_l.render('by jawosylu', True, 'White')
         name_b = self.font_l.render('by jawosylu', True, 'mediumpurple1')
         name_b_rect = name_b.get_rect(topleft=(3, 3))
         name_rect = name.get_rect(topleft=(0, 0))
-        rect = label.get_rect(center=(surface.get_width() // 2, surface.get_height() // 3))
-        label_ins = self.font_l.render('Press a key or the mouse to start!', True, 'White')
-        rect_ins = label_ins.get_rect(center=(surface.get_width() // 2, surface.get_height() - 100))
+        rect = label.get_rect(center=(
+            surface.get_width() // 2, surface.get_height() // 3
+        ))
+        label_ins = self.font_l.render(
+            'Press a key or the mouse to start!', True, 'White'
+        )
+        rect_ins = label_ins.get_rect(center=(
+            surface.get_width() // 2, surface.get_height() - 100
+        ))
         surface.blit(label_ins, rect_ins)
         surface.blit(name_b, name_b_rect)
         surface.blit(label_b, rect_b)
@@ -115,6 +128,7 @@ class DroneScreen(BaseScene):
     max_scalling = 35
     padding_x = 150
     padding_y = 50
+
     def __init__(
         self,
         background: Background,
@@ -160,20 +174,31 @@ class DroneScreen(BaseScene):
         return surface
 
     def _draw_log(self, surface: pg.Surface):
-        pg.draw.rect(surface, 'White', pg.Rect(self.width - 2 * self.padding_x, self.height - 5 * self.padding_y, 2 * self.padding_x - 25, 5 * self.padding_y - 25), 3, 3)
-        
+        pg.draw.rect(
+            surface, 'White',
+            pg.Rect(
+                self.width - 2 * self.padding_x,
+                self.height - 5 * self.padding_y,
+                2 * self.padding_x - 25, 5 * self.padding_y - 25
+            ), 3, 3
+        )
+
     def _draw_infos(self):
-        ... # TODO: draw infos for each drone on hover
+        ...  # TODO: draw infos for each drone on hover
 
     def _draw_legend(self, surface: pg.Surface) -> None:
-        label = self.font.render('Space: Pause/unpause Right arrow: next turn', True, 'White')
+        label = self.font.render(
+            'Space: Pause/unpause Right arrow: next turn', True, 'White'
+        )
         label_rect = label.get_rect(topright=(self.width - 25, 0))
         surface.blit(label, label_rect)
 
     def _calculate_margin(self, list_zones: list[Zone]):
         max_name_w = max([self.font.size(zone.name)[0] for zone in list_zones])
         name_h = self.font.size(list_zones[0].name)[1]
-        self.margin_x = max(self.max_scalling, max_name_w // 2) + self.padding_x
+        self.margin_x = max(
+            self.max_scalling, max_name_w // 2
+        ) + self.padding_x
         self.margin_y = self.max_scalling + name_h + self.padding_y
         return {
             zone.name: (zone.coordinates[0], zone.coordinates[1])
@@ -186,7 +211,9 @@ class DroneScreen(BaseScene):
         list_connections: list[Connection],
         surface
     ) -> pg.Surface:
-        zone_png = pg.image.load('src/visual/assets/zone/zone.png').convert_alpha()
+        zone_png = pg.image.load(
+            'src/visual/assets/zone/zone.png'
+        ).convert_alpha()
         max_x = max(pos[0] for pos in self.zone_positions.values())
         max_y = max(pos[1] for pos in self.zone_positions.values())
         min_x = min(pos[0] for pos in self.zone_positions.values())
@@ -214,7 +241,6 @@ class DroneScreen(BaseScene):
             for zone in list_zones
         }
         self._screen_positions = screen_positions
-        scalling = max(self.min_scalling, min(scale * 2, self.max_scalling))
         colors = {zone.name: zone.color for zone in list_zones}
         for connection in list_connections:
             start = screen_positions[connection.zone_a]
@@ -250,7 +276,6 @@ class DroneScreen(BaseScene):
                 self.end = True
         elif event.type == pg.MOUSEBUTTONDOWN:
             ...
-        
 
     def update_content(self, dt: float) -> None:
         if self.end or self.pause:
@@ -269,7 +294,6 @@ class DroneScreen(BaseScene):
         )
         if not self._finished:
             print(self.current_turn)
-        
 
     def _final_zone_pos(self, drone) -> tuple[float, float] | None:
         if drone.current_zone is not None:
@@ -308,80 +332,110 @@ class DroneScreen(BaseScene):
             if pos is None:
                 continue
             self.dronesystem.print_drone_img(surface, pos)
-        turn_count = self.font.render(f"Turn: {str(self.scheduler.current_turn)}", True, 'White')
-        turn_rect = turn_count.get_rect(topleft=(0,0))
+        turn_count = self.font.render(
+            f"Turn: {str(self.scheduler.current_turn)}", True, 'White'
+        )
+        turn_rect = turn_count.get_rect(topleft=(0, 0))
         surface.blit(turn_count, turn_rect)
         x = 0
-        label_surface = pg.Surface((2 * self.padding_x - 25, 5 * self.padding_y - 25), pg.SRCALPHA)
+        label_surface = pg.Surface(
+            (2 * self.padding_x - 25,
+             5 * self.padding_y - 25), pg.SRCALPHA
+        )
         if self.current_turn is not None:
             for turn in self.current_turn.split(' '):
                 label = self.font.render(turn, True, 'White')
                 label_rect = label.get_rect(topleft=(5, x))
                 x += 25
                 label_surface.blit(label, label_rect)
-            surface.blit(label_surface, (self.width - 2 * self.padding_x, self.height - 5 * self.padding_y))
+            surface.blit(
+                label_surface, (
+                    self.width - 2 * self.padding_x,
+                    self.height - 5 * self.padding_y
+                )
+            )
 
-    def next_scene(self) -> str | None: 
+    def next_scene(self) -> str | None:
         if self.end and self.scheduler:
             return 'menu'
         else:
             return None
 
+
 class MapItem():
-    def __init__(self, label: str, path: str, pos: tuple, target: str = 'drone'):
+    def __init__(
+        self, label: str,
+        path: str, pos: tuple,
+        target: str = 'drone'
+    ):
         self.label = label
         self.path = path
         self.pos = pos
         self.target = target
 
+
 class MapSelection(BaseScene):
-        def __init__(self, background, particles, avaiable_maps: list[MapItem], offset_x, offset_y, scale, font):
-            self.target = 0
-            self.maps = avaiable_maps
-            self.offset_x = offset_x
-            self.offset_y = offset_y
-            self._chosen = None
-            self.scale = scale
-            self.font = font
-            super().__init__(background, particles)
+    def __init__(
+        self,
+        background,
+        particles,
+        avaiable_maps: list[MapItem],
+        offset_x, offset_y, scale, font
+    ):
+        self.target = 0
+        self.maps = avaiable_maps
+        self.offset_x = offset_x
+        self.offset_y = offset_y
+        self._chosen = None
+        self.scale = scale
+        self.font = font
+        super().__init__(background, particles)
 
-        def handle_event(self, event: pg.event.Event) -> None:
-            if event.type == pg.MOUSEMOTION:
-                for index, item in enumerate(self.maps):
-                    if item.rect and item.rect.collidepoint(event.pos):
-                        self.target = index
-            elif event.type == pg.MOUSEBUTTONDOWN:
-                item = self.maps[self.target]
-                if item.rect and item.rect.collidepoint(event.pos):
-                    self._chosen = item.target
-            elif event.type == pg.KEYDOWN:
-                if event.key == pg.K_DOWN:
-                    self.target = (self.target + 1) % len(self.maps)
-                elif event.key == pg.K_UP:
-                    self.target = (self.target - 1) % len(self.maps)
-                elif event.key == pg.K_RETURN:
-                    self._chosen = self.maps[self.target]
-
-        def update_content(self, dt):
-            ...
-
-        def draw_content(self, surface):
+    def handle_event(self, event: pg.event.Event) -> None:
+        if event.type == pg.MOUSEMOTION:
             for index, item in enumerate(self.maps):
-                color = 'Purple' if index == self.target else 'White'
-                label = self.font.render(item.label, True, color)
-                item.rect = label.get_rect(topleft=item.pos)
-                surface.blit(label, item.pos)
+                if item.rect and item.rect.collidepoint(event.pos):
+                    self.target = index
+        elif event.type == pg.MOUSEBUTTONDOWN:
+            item = self.maps[self.target]
+            if item.rect and item.rect.collidepoint(event.pos):
+                self._chosen = item.target
+        elif event.type == pg.KEYDOWN:
+            if event.key == pg.K_DOWN:
+                self.target = (self.target + 1) % len(self.maps)
+            elif event.key == pg.K_UP:
+                self.target = (self.target - 1) % len(self.maps)
+            elif event.key == pg.K_RETURN:
+                self._chosen = self.maps[self.target]
 
-        def next_scene(self):
-            if self._chosen is None:
-                return None
-            config = input_parsing(self._chosen.path)
-            map = Map.from_config(config)
-            graph = Graph(map)
-            F = DroneFactory(int(config.nb_drones))
-            _, predecessors = graph.shortest_distance(config.start)
-            F.get_drone_list(start_hub=config.start, path=graph.shortest_path(config.start, config.end, predecessors))
-            return (self._chosen.target, Scheduler(map, graph, F.drone_list, config), config)
+    def update_content(self, dt):
+        ...
+
+    def draw_content(self, surface):
+        for index, item in enumerate(self.maps):
+            color = 'Purple' if index == self.target else 'White'
+            label = self.font.render(item.label, True, color)
+            item.rect = label.get_rect(topleft=item.pos)
+            surface.blit(label, item.pos)
+
+    def next_scene(self):
+        if self._chosen is None:
+            return None
+        config = input_parsing(self._chosen.path)
+        map = Map.from_config(config)
+        graph = Graph(map)
+        F = DroneFactory(int(config.nb_drones))
+        _, predecessors = graph.shortest_distance(config.start)
+        F.get_drone_list(
+            start_hub=config.start, path=graph.shortest_path(
+                config.start, config.end, predecessors
+            )
+        )
+        return (
+            self._chosen.target, Scheduler(
+                map, graph, F.drone_list, config
+            ), config
+        )
 
 
 class Visualizer():
@@ -413,7 +467,6 @@ class Visualizer():
         self._font: pg.font.Font | None = None
         self._font_intro: pg.font.Font | None = None
 
-
     def _make_scene(self, name: str, scheduler=None, config=None) -> Scene:
         background = Background(self.height, self._BACKGROUND_LAYERS)
         particles = ParticleSystem(
@@ -421,10 +474,14 @@ class Visualizer():
         )
         drone_system = Drone_System(self._Drone_layers, self.height)
         if name == 'intro':
-            return IntroScreen(background, particles, self._font_intro, self._font)
+            return IntroScreen(
+                background, particles, self._font_intro, self._font
+            )
         if name == 'menu':
             items = [
-                MenuItem('start', (self.width // 5, 150), 'map' if self.scheduler is None else 'drone'),
+                MenuItem('start', (
+                    self.width // 5, 150
+                ), 'map' if self.scheduler is None else 'drone'),
                 MenuItem('back', (self.width // 5, 200), 'intro'),
                 MenuItem('quit', (self.width // 5, 250), 'quit')
             ]
@@ -434,8 +491,10 @@ class Visualizer():
                 background,
                 particles,
                 self._font,
-                self.list_zones if self.list_zones is not None else config.zones,
-                self.list_connections if self.list_connections is not None else config.connections,
+                self.list_zones if self.list_zones is not None
+                else config.zones,
+                self.list_connections if self.list_connections is not None
+                else config.connections,
                 self.scheduler if self.scheduler is not None else scheduler,
                 self.width,
                 self.height,
@@ -443,35 +502,94 @@ class Visualizer():
             )
         if name == 'map':
             items = [
-                MapItem('Map 01: Linear Path', './maps/easy/01_linear_path.txt', (self.width // 8, 50), 'drone'),
-                MapItem('Map 02: Simple Fork', './maps/easy/02_simple_fork.txt', (self.width // 8, 100), 'drone'),
-                MapItem('Map 03: Basic Capacity', './maps/easy/03_basic_capacity.txt', (self.width // 8, 150), 'drone'),
-                MapItem('Map 04: Dead End Trap', './maps/medium/01_dead_end_trap.txt', (self.width // 8, 200), 'drone'),
-                MapItem('Map 05: Circular Loop', './maps/medium/02_circular_loop.txt', (self.width // 8, 250), 'drone'),
-                MapItem('Map 06: Priority Puzzle', './maps/medium/03_priority_puzzle.txt', (self.width // 8, 300), 'drone'),
-                MapItem('Map 07: Maze Nightmare', './maps/hard/01_maze_nightmare.txt', (self.width // 8, 350), 'drone'),
-                MapItem('Map 08: Capacity Hell', './maps/hard/02_capacity_hell.txt', (self.width // 8, 400), 'drone'),
-                MapItem('Map 09: Dead End Trap', './maps/hard/03_ultimate_challenge.txt', (self.width // 8, 450), 'drone')
+                MapItem(
+                    'Map 01: Linear Path',
+                    './maps/easy/01_linear_path.txt', (
+                        self.width // 8, 50
+                    ), 'drone'
+                ),
+                MapItem(
+                    'Map 02: Simple Fork',
+                    './maps/easy/02_simple_fork.txt', (
+                        self.width // 8, 100
+                    ), 'drone'
+                ),
+                MapItem(
+                    'Map 03: Basic Capacity',
+                    './maps/easy/03_basic_capacity.txt', (
+                        self.width // 8, 150
+                    ), 'drone'
+                ),
+                MapItem(
+                    'Map 04: Dead End Trap',
+                    './maps/medium/01_dead_end_trap.txt', (
+                        self.width // 8, 200
+                    ), 'drone'
+                ),
+                MapItem(
+                    'Map 05: Circular Loop',
+                    './maps/medium/02_circular_loop.txt', (
+                        self.width // 8, 250
+                    ), 'drone'
+                ),
+                MapItem(
+                    'Map 06: Priority Puzzle',
+                    './maps/medium/03_priority_puzzle.txt', (
+                        self.width // 8, 300
+                    ), 'drone'
+                ),
+                MapItem(
+                    'Map 07: Maze Nightmare',
+                    './maps/hard/01_maze_nightmare.txt', (
+                        self.width // 8, 350
+                    ), 'drone'
+                ),
+                MapItem(
+                    'Map 08: Capacity Hell',
+                    './maps/hard/02_capacity_hell.txt', (
+                        self.width // 8, 400
+                    ), 'drone'
+                ),
+                MapItem(
+                    'Map 09: Dead End Trap',
+                    './maps/hard/03_ultimate_challenge.txt', (
+                        self.width // 8, 450
+                    ), 'drone'
+                )
             ]
-            return MapSelection(background, particles, items, None, None, None, self._font)
+            return MapSelection(
+                background, particles, items, None, None, None, self._font
+            )
         raise ValueError(f'Unknown scene: {name}')
 
     def run(self) -> None:
         pg.init()
-        screen = pg.display.set_mode((self.width, self.height), pg.RESIZABLE | pg.SCALED)
+        screen = pg.display.set_mode(
+            (self.width, self.height), pg.RESIZABLE | pg.SCALED
+        )
         screen.fill('White')
-        icon_surface = pg.image.load('src/visual/assets/icon_128.png').convert()
+        icon_surface = pg.image.load(
+            'src/visual/assets/icon_128.png'
+        ).convert()
         pg.display.set_icon(icon_surface)
         pg.display.set_caption('Fly-In')
         clock = pg.time.Clock()
-        if self._font == None or self._font_intro == None:
-            self._font_intro = pg.font.Font('src/visual/assets/font.ttf', int(24 * self.width / self.height))
-            self._font = pg.font.Font('src/visual/assets/font.ttf', int(12 * self.width / self.height))
+        if self._font is None or self._font_intro is None:
+            self._font_intro = pg.font.Font(
+                'src/visual/assets/font.ttf', int(
+                    24 * self.width / self.height
+                )
+            )
+            self._font = pg.font.Font(
+                'src/visual/assets/font.ttf', int(
+                    12 * self.width / self.height
+                )
+            )
         self.scenes = [self._make_scene('intro')]
         while True:
             dt = clock.tick(60) / 1000
             if isinstance(self.scenes[-1], tuple):
-                current,_,_ = self.scenes[-1]
+                current, _, _ = self.scenes[-1]
             else:
                 current = self.scenes[-1]
             for event in pg.event.get():
@@ -494,6 +612,8 @@ class Visualizer():
                 sys.exit()
             elif target:
                 if isinstance(target, tuple):
-                    self.scenes.append(self._make_scene(target[0], target[1], target[2]))
+                    self.scenes.append(self._make_scene(
+                        target[0], target[1], target[2]
+                    ))
                 else:
                     self.scenes.append(self._make_scene(target))
