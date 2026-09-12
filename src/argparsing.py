@@ -3,9 +3,6 @@ import argparse
 
 
 class ArgParsing:
-    def __init__(self):
-        pass
-
     @staticmethod
     def get_flag():
         argument_parser = argparse.ArgumentParser(description="CLI for Fly-In")

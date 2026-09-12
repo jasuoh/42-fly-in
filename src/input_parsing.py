@@ -7,8 +7,8 @@ import sys
 
 
 class InvalidZoneType(Exception):
-    def __str__(self) -> None:
-        ...
+    def __str__(self) -> str:
+        return "Invaid Zone Type Error occured"
 
 
 class zone_types(Enum):
@@ -51,7 +51,7 @@ class Zone(BaseModel):
 
 
 class InputParsingError(Exception):
-    def __str__(self):
+    def __str__(self) -> None:
         return super().__str__()
 
 
@@ -97,7 +97,7 @@ class Config_Map():
             print(e)
         self._value_dict = value_dict
 
-    def _assign_dict_to_obj(self):
+    def _assign_dict_to_obj(self) -> None:
         input_dict = self._value_dict
         allowed_keys_zones = ['zone', 'color', 'max_drones']
         allowed_keys_connections = ['max_link_capacity']
