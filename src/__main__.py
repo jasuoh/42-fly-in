@@ -1,6 +1,5 @@
 #! /usr/bin/env python3
 
-import pyautogui
 from .input_parsing import input_parsing
 from .argparsing import ArgParsing
 from .pathfinding_algorithm import Map, Graph
@@ -17,7 +16,6 @@ def main() -> None:
     G = Graph(map)
     _, predecessors = G.shortest_distance(config.start)
     F = DroneFactory(int(config.nb_drones))
-    width, height = pyautogui.size()
 
     F.get_drone_list(
             start_hub=config.start,
@@ -28,12 +26,12 @@ def main() -> None:
         )
     if readed_path == 'maps/easy/01_linear_path.txt':
         Visualizer(
-            0.75 * width, 0.75 * height, None, None
+            None, None
         ).run()
     else:
         S = Scheduler(map=map, graph=G, drone_list=F.drone_list, config=config)
         Visualizer(
-            0.75 * width, 0.75 * height, config.zones, config.connections, S
+            config.zones, config.connections, S
         ).run()
 
 
