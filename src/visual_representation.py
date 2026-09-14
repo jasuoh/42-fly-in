@@ -234,10 +234,6 @@ class DroneScreen(BaseScene):
         color = pg.Color(color)
         s = surface.copy()
         s.fill(color, special_flags=pg.BLEND_RGBA_MULT)
-        # ratio = self.height / s.get_height()
-        # new_width = int(s.get_width() * ratio)
-        # new_size = (int(new_width * scalling), int(self.height * scalling))
-        # return pg.transform.scale(s, new_size)
         return s
 
     def handle_event(self, event: pg.event.Event) -> None:
@@ -257,6 +253,8 @@ class DroneScreen(BaseScene):
             return
         self.dronesystem.update(dt)
         self._elapsed += dt
+        if self._finished:
+            return
         if self._elapsed < self.turn_interval:
             return
         self._elapsed = 0.0
