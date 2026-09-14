@@ -257,6 +257,8 @@ class DroneScreen(BaseScene):
             return
         self.dronesystem.update(dt)
         self._elapsed += dt
+        if self._finished:
+            return
         if self._elapsed < self.turn_interval:
             return
         self._elapsed = 0.0
