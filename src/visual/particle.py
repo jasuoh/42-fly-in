@@ -4,6 +4,7 @@ import random
 from abc import ABC, abstractmethod
 import pygame as pg
 
+
 class Particle(ABC):
     def __init__(self, screen_width: int, screen_height: int) -> None:
         self.screen_width = screen_width
@@ -30,6 +31,7 @@ class Snowflake(Particle):
             surface, 'White', (int(self.pos_x), int(self.pos_y)),
             self.radius
         )
+
 
 class ParticleSystem():
     def __init__(self, particles: list[Particle]) -> None:
