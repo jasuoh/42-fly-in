@@ -26,7 +26,7 @@ def main() -> None:
     planner = RoutePlanner(
         map=map, graph=G, start=config.start, end=config.end
     )
-    F = DroneFactory(int(config.nb_drones))
+    F = DroneFactory((config.nb_drones))
     F.get_drone_list(
         start_hub=config.start,
         paths=planner.assign_paths(int(config.nb_drones)),

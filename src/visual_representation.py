@@ -601,7 +601,6 @@ class MapSelection(BaseScene):
         """
         if self._chosen is None:
             return None
-        print(self._chosen.path)
         config = input_parsing(self._chosen.path)
         assert config.start is not None
         assert config.end is not None
