@@ -399,12 +399,12 @@ class DroneScreen(BaseScene):
         self._prev_positions = self._capture_positions()
         self.current_turn = self.scheduler.gen_turn()
         self._target_positions = self._capture_positions()
+        if not self._finished:
+                    print(self.current_turn)
         self._finished = all(
             drone.current_status == status_type.delivered
             for drone in self.scheduler.drone_list
         )
-        if not self._finished:
-            print(self.current_turn)
 
     def _final_zone_pos(self, drone: Drone) -> tuple[float, float] | None:
         """Return the screen position of the zone ``drone`` currently
@@ -654,8 +654,8 @@ class Visualizer():
                 command line, or None to let the user pick one from
                 the menu.
         """
-        self.width = 1920
-        self.height = 1080
+        self.width = 1400
+        self.height = 800
         self.list_zones = list_zones
         self.list_connections = list_connections
         self.scheduler = scheduler
