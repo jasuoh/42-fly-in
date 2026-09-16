@@ -1,9 +1,10 @@
 #! /usr/bin/env python3
+"""Pygame scenes: intro, menus, map selection and the live simulation view."""
 
 
 import sys
 import pygame as pg
-from .drone_factory import status_type
+from .drone_factory import Drone, status_type
 from .input_parsing import Connection, Zone
 from .simulation_engine import Scheduler
 from .input_parsing import input_parsing, Config_Map
@@ -17,6 +18,8 @@ from .visual import (
 
 
 class IntroScreen(BaseScene):
+    """The splash screen shown when the application starts."""
+
     def __init__(
         self,
         background: Background,
@@ -25,6 +28,16 @@ class IntroScreen(BaseScene):
         font_l: pg.font.Font,
         duration: float = 25,
     ) -> None:
+        """Create the intro screen.
+
+        Args:
+            background: Parallax background to draw behind the scene.
+            particles: Particle system to draw in front of the
+                background.
+            font: Font used for the title.
+            font_l: Font used for the smaller labels.
+            duration: Seconds to wait before auto-advancing to the menu.
+        """
         super().__init__(background, particles)
         self.font = font
         self.font_l = font_l
@@ -32,15 +45,18 @@ class IntroScreen(BaseScene):
         self._elapsed = 0.0
 
     def handle_event(self, event: pg.event.Event) -> None:
+        """Skip straight to the menu on any key press or click."""
         if event.type == pg.KEYDOWN:
             self._elapsed = self.duration
         elif event.type == pg.MOUSEBUTTONDOWN:
             self._elapsed = self.duration
 
     def update_content(self, dt: float) -> None:
+        """Advance the auto-advance timer by ``dt`` seconds."""
         self._elapsed += dt
 
     def draw_content(self, surface: pg.Surface) -> None:
+        """Draw the title, author and instructions onto ``surface``."""
         label = self.font.render('Fly-In', True, 'White')
         label_b = self.font.render('Fly-In', True, 'mediumpurple1')
         rect_b = label_b.get_rect(
@@ -68,11 +84,21 @@ class IntroScreen(BaseScene):
         surface.blit(name, name_rect)
 
     def next_scene(self) -> str | None:
+        """Move to the menu once the auto-advance duration has elapsed."""
         return 'menu' if self._elapsed >= self.duration else None
 
 
 class MenuItem():
-    def __init__(self, label: str, pos, target: str) -> None:
+    """A single clickable entry of the main :class:`Menu`."""
+
+    def __init__(self, label: str, pos: tuple[int, int], target: str) -> None:
+        """Create a menu item.
+
+        Args:
+            label: Text displayed for this entry.
+            pos: Top-left screen position of the label.
+            target: Scene name to transition to when chosen.
+        """
         self.label = label
         self.pos = pos
         self.target = target
@@ -80,6 +106,8 @@ class MenuItem():
 
 
 class Menu(BaseScene):
+    """The main menu: start, back and quit."""
+
     def __init__(
         self,
         background: Background,
@@ -87,6 +115,15 @@ class Menu(BaseScene):
         font: pg.font.Font,
         items: list[MenuItem],
     ) -> None:
+        """Create the menu with the given entries.
+
+        Args:
+            background: Parallax background to draw behind the scene.
+            particles: Particle system to draw in front of the
+                background.
+            font: Font used to render the entries.
+            items: The selectable menu entries.
+        """
         super().__init__(background, particles)
         self.font = font
         self.items = items
@@ -94,6 +131,7 @@ class Menu(BaseScene):
         self._chosen: str | None = None
 
     def handle_event(self, event: pg.event.Event) -> None:
+        """Handle keyboard/mouse navigation and selection."""
         if event.type == pg.MOUSEMOTION:
             for index, item in enumerate(self.items):
                 if item.rect and item.rect.collidepoint(event.pos):
@@ -111,9 +149,11 @@ class Menu(BaseScene):
                 self._chosen = self.items[self.selected].target
 
     def update_content(self, dt: float) -> None:
+        """The menu has no time-based state to update."""
         ...
 
     def draw_content(self, surface: pg.Surface) -> None:
+        """Draw every menu entry, highlighting the selected one."""
         for index, item in enumerate(self.items):
             color = 'Purple' if index == self.selected else 'White'
             label = self.font.render(item.label, True, color)
@@ -121,10 +161,13 @@ class Menu(BaseScene):
             surface.blit(label, item.pos)
 
     def next_scene(self) -> str | None:
+        """Return the target of the chosen entry, if any."""
         return self._chosen
 
 
 class DroneScreen(BaseScene):
+    """The live simulation view: network layout, drones and turn log."""
+
     min_scalling = 5
     max_scalling = 35
     padding_x = 150
@@ -143,21 +186,36 @@ class DroneScreen(BaseScene):
         dronesystem: Drone_System,
         turn_interval: float = 2
     ) -> None:
+        """Create the simulation view for a fully built scheduler.
+
+        Args:
+            background: Parallax background to draw behind the scene.
+            particles: Particle system to draw in front of the
+                background.
+            font: Font used for all labels.
+            list_zones: Every zone of the current map.
+            list_connections: Every connection of the current map.
+            scheduler: The simulation to advance and display.
+            screen_width: Width of the drawing surface in pixels.
+            screen_height: Height of the drawing surface in pixels.
+            dronesystem: Shared animated drone sprite.
+            turn_interval: Seconds of animation between two turns.
+        """
         super().__init__(background, particles)
         self.font = font
         self.scheduler = scheduler
         self.turn_interval = turn_interval
         self._elapsed = 0.0
         self._finished = False
-        self.margin_x = None
-        self.margin_y = None
+        self.margin_x: int | None = None
+        self.margin_y: int | None = None
         self.pause = False
         self.end = False
-        self.current_turn = None
+        self.current_turn: str | None = None
         self.width = screen_width
         self.height = screen_height
         self.dronesystem = dronesystem
-        self._screen_positions = None
+        self._screen_positions: dict[str, tuple[float, float]] | None = None
         self._zone_capacities: dict[str, int] = {
             zone.name: cap
             for zone in list_zones
@@ -172,6 +230,7 @@ class DroneScreen(BaseScene):
         self._static_surface = self._draw_static_surface(
             list_zones, list_connections
         )
+        assert self._screen_positions is not None
         self._connection_midpoints: dict[
             tuple[str, str], tuple[float, float]
         ] = {
@@ -187,10 +246,18 @@ class DroneScreen(BaseScene):
             )
             for zone_a, zone_b in self._link_capacities
         }
-        self._prev_positions = self._capture_positions()
-        self._target_positions = self._prev_positions
+        self._prev_positions: dict[int, tuple[float, float]] = (
+            self._capture_positions()
+        )
+        self._target_positions: dict[int, tuple[float, float]] = (
+            self._prev_positions
+        )
 
-    def _draw_static_surface(self, list_zones, list_connections):
+    def _draw_static_surface(
+        self, list_zones: list[Zone], list_connections: list[Connection]
+    ) -> pg.Surface:
+        """Pre-render the parts of the view that never change: network, log
+        frame and legend."""
         surface = pg.Surface(
             (self.width, self.height), pg.SRCALPHA
         )
@@ -199,7 +266,8 @@ class DroneScreen(BaseScene):
         self._draw_legend(surface)
         return surface
 
-    def _draw_log(self, surface: pg.Surface):
+    def _draw_log(self, surface: pg.Surface) -> None:
+        """Draw the empty frame the turn log is later printed into."""
         pg.draw.rect(
             surface, 'White',
             pg.Rect(
@@ -210,13 +278,25 @@ class DroneScreen(BaseScene):
         )
 
     def _draw_legend(self, surface: pg.Surface) -> None:
+        """Draw the keyboard shortcut hint in the top-right corner."""
         label = self.font.render(
             'Space: Pause/unpause Right arrow: next turn', True, 'White'
         )
         label_rect = label.get_rect(topright=(self.width - 25, 0))
         surface.blit(label, label_rect)
 
-    def _calculate_margin(self, list_zones: list[Zone]):
+    def _calculate_margin(
+        self, list_zones: list[Zone]
+    ) -> dict[str, tuple[int, int]]:
+        """Compute screen margins from label sizes and return raw zone
+        coordinates.
+
+        Args:
+            list_zones: Every zone of the current map.
+
+        Returns:
+            Each zone's raw (unscaled) coordinates, keyed by name.
+        """
         max_name_w = max([self.font.size(zone.name)[0] for zone in list_zones])
         name_h = self.font.size(list_zones[0].name)[1]
         self.margin_x = max(
@@ -232,8 +312,15 @@ class DroneScreen(BaseScene):
         self,
         list_zones: list[Zone],
         list_connections: list[Connection],
-        surface
+        surface: pg.Surface
     ) -> pg.Surface:
+        """Draw every connection and zone, scaled to fit the screen.
+
+        Also records the resulting screen-space positions in
+        ``self._screen_positions`` for later use by drone drawing.
+        """
+        assert self.margin_x is not None
+        assert self.margin_y is not None
         zone_png = pg.image.load(
             'src/visual/assets/zone/zone.png'
         ).convert_alpha()
@@ -279,13 +366,15 @@ class DroneScreen(BaseScene):
             surface.blit(s, rect)
         return surface
 
-    def tint(self, surface, color):
-        color = pg.Color(color)
+    def tint(self, surface: pg.Surface, color: str) -> pg.Surface:
+        """Return a copy of ``surface`` multiplied by ``color``."""
+        parsed_color = pg.Color(color)
         s = surface.copy()
-        s.fill(color, special_flags=pg.BLEND_RGBA_MULT)
+        s.fill(parsed_color, special_flags=pg.BLEND_RGBA_MULT)
         return s
 
     def handle_event(self, event: pg.event.Event) -> None:
+        """Handle turn stepping, pause toggling and returning to the menu."""
         if event.type == pg.KEYDOWN and event.key == pg.K_RIGHT:
             self._elapsed = self.turn_interval
         elif event.type == pg.KEYDOWN:
@@ -297,6 +386,7 @@ class DroneScreen(BaseScene):
             ...
 
     def update_content(self, dt: float) -> None:
+        """Advance drone animation and, once per interval, the simulation."""
         if self.end or self.pause:
             return
         self.dronesystem.update(dt)
@@ -316,7 +406,11 @@ class DroneScreen(BaseScene):
         if not self._finished:
             print(self.current_turn)
 
-    def _final_zone_pos(self, drone) -> tuple[float, float] | None:
+    def _final_zone_pos(self, drone: Drone) -> tuple[float, float] | None:
+        """Return the screen position of the zone ``drone`` currently
+        occupies or is transiting toward."""
+        if self._screen_positions is None:
+            return None
         if drone.current_zone is not None:
             return self._screen_positions[drone.current_zone]
         in_flight = self.scheduler.in_flight.get(drone.drone_id)
@@ -326,6 +420,7 @@ class DroneScreen(BaseScene):
         return self._screen_positions[destination]
 
     def _capture_positions(self) -> dict[int, tuple[float, float]]:
+        """Snapshot every drone's current target position, keyed by id."""
         if self._screen_positions is None:
             return {}
         positions = {}
@@ -335,7 +430,8 @@ class DroneScreen(BaseScene):
                 positions[drone.drone_id] = pos
         return positions
 
-    def _drone_screen_pos(self, drone) -> tuple[float, float] | None:
+    def _drone_screen_pos(self, drone: Drone) -> tuple[float, float] | None:
+        """Return ``drone``'s interpolated screen position for this frame."""
         target = self._target_positions.get(drone.drone_id)
         if target is None:
             return self._final_zone_pos(drone)
@@ -347,6 +443,7 @@ class DroneScreen(BaseScene):
         )
 
     def draw_content(self, surface: pg.Surface) -> None:
+        """Draw the network, every drone, the turn counter and the log."""
         surface.blit(self._static_surface, (0, 0))
         for drone in self.scheduler.drone_list:
             pos = self._drone_screen_pos(drone)
@@ -378,6 +475,9 @@ class DroneScreen(BaseScene):
         self._draw_capacities(surface)
 
     def _draw_capacities(self, surface: pg.Surface) -> None:
+        """Draw zone occupancy and link usage labels over the network."""
+        if self._screen_positions is None:
+            return
         for name, cap in self._zone_capacities.items():
             pos = self._screen_positions[name]
             occupancy = self.scheduler.zone_occupancy.get(name, 0)
@@ -396,6 +496,7 @@ class DroneScreen(BaseScene):
             surface.blit(label, label_rect)
 
     def next_scene(self) -> str | None:
+        """Return to the menu once the user ends the finished simulation."""
         if self.end and self.scheduler:
             return 'menu'
         else:
@@ -403,11 +504,21 @@ class DroneScreen(BaseScene):
 
 
 class MapItem():
+    """A single selectable entry of the :class:`MapSelection` screen."""
+
     def __init__(
         self, label: str,
-        path: str, pos: tuple,
+        path: str, pos: tuple[int, int],
         target: str = 'drone'
     ):
+        """Create a map selection entry.
+
+        Args:
+            label: Text displayed for this entry.
+            path: Path to the map configuration file it loads.
+            pos: Top-left screen position of the label.
+            target: Scene name to transition to when chosen.
+        """
         self.label = label
         self.path = path
         self.pos = pos
@@ -416,23 +527,42 @@ class MapItem():
 
 
 class MapSelection(BaseScene):
+    """The screen listing every bundled map, ready to be simulated."""
+
     def __init__(
         self,
-        background,
-        particles,
+        background: Background,
+        particles: ParticleSystem,
         avaiable_maps: list[MapItem],
-        offset_x, offset_y, scale, font
+        offset_x: int | None, offset_y: int | None,
+        scale: float | None, font: pg.font.Font
     ):
+        """Create the map selection screen.
+
+        Args:
+            background: Parallax background to draw behind the scene.
+            particles: Particle system to draw in front of the
+                background.
+            avaiable_maps: The selectable map entries.
+            offset_x: Unused horizontal layout offset, reserved for
+                future layout tweaks.
+            offset_y: Unused vertical layout offset, reserved for
+                future layout tweaks.
+            scale: Unused layout scale, reserved for future layout
+                tweaks.
+            font: Font used to render the entries.
+        """
         self.target = 0
         self.maps = avaiable_maps
         self.offset_x = offset_x
         self.offset_y = offset_y
-        self._chosen = None
+        self._chosen: MapItem | None = None
         self.scale = scale
         self.font = font
         super().__init__(background, particles)
 
     def handle_event(self, event: pg.event.Event) -> None:
+        """Handle keyboard/mouse navigation and map selection."""
         if event.type == pg.MOUSEMOTION:
             for index, item in enumerate(self.maps):
                 if item.rect and item.rect.collidepoint(event.pos):
@@ -449,10 +579,12 @@ class MapSelection(BaseScene):
             elif event.key == pg.K_RETURN:
                 self._chosen = self.maps[self.target]
 
-    def update_content(self, dt):
+    def update_content(self, dt: float) -> None:
+        """The map selection screen has no time-based state to update."""
         ...
 
-    def draw_content(self, surface):
+    def draw_content(self, surface: pg.Surface) -> None:
+        """Draw every map entry, highlighting the targeted one."""
         for index, item in enumerate(self.maps):
             color = 'Purple' if index == self.target else 'White'
             label = self.font.render(item.label, True, color)
@@ -460,10 +592,20 @@ class MapSelection(BaseScene):
             surface.blit(label, item.pos)
 
     def next_scene(self) -> str | tuple[str, Scheduler, Config_Map] | None:
+        """Parse and plan the chosen map, then hand off to the drone screen.
+
+        Returns:
+            None while no map has been chosen yet, otherwise a
+            ``(scene name, scheduler, config)`` tuple ready for
+            :class:`DroneScreen`.
+        """
         if self._chosen is None:
             return None
         print(self._chosen.path)
         config = input_parsing(self._chosen.path)
+        assert config.start is not None
+        assert config.end is not None
+        assert config.nb_drones is not None
         map = Map.from_config(config)
         graph = Graph(map)
         planner = RoutePlanner(
@@ -482,6 +624,8 @@ class MapSelection(BaseScene):
 
 
 class Visualizer():
+    """Owns the pygame window and drives the scene stack."""
+
     _BACKGROUND_LAYERS: list[tuple[str, float, bool]] = [
         ('src/visual/assets/background/1.png', 0.2, False),
         ('src/visual/assets/background/2.png', 0.35, True),
@@ -499,16 +643,51 @@ class Visualizer():
         list_connections: list[Connection] | None,
         scheduler: Scheduler | None = None
     ) -> None:
+        """Create the visualizer.
+
+        Args:
+            list_zones: Zones of a map already chosen on the command
+                line, or None to let the user pick one from the menu.
+            list_connections: Connections of a map already chosen on
+                the command line, or None to let the user pick one
+                from the menu.
+            scheduler: Simulation for a map already chosen on the
+                command line, or None to let the user pick one from
+                the menu.
+        """
         self.width = 1920
         self.height = 1080
         self.list_zones = list_zones
         self.list_connections = list_connections
         self.scheduler = scheduler
-        self.scenes: list[tuple[Scene, Scheduler]] = []
+        self.scenes: list[Scene] = []
         self._font: pg.font.Font | None = None
         self._font_intro: pg.font.Font | None = None
 
-    def _make_scene(self, name: str, scheduler=None, config=None) -> Scene:
+    def _make_scene(
+        self,
+        name: str,
+        scheduler: Scheduler | None = None,
+        config: Config_Map | None = None
+    ) -> Scene:
+        """Build the scene named ``name``.
+
+        Args:
+            name: One of ``intro``, ``menu``, ``drone`` or ``map``.
+            scheduler: Simulation to display, used by the ``drone``
+                scene when none was given on the command line.
+            config: Map configuration matching ``scheduler``, used by
+                the ``drone`` scene when none was given on the command
+                line.
+
+        Returns:
+            The newly built scene.
+
+        Raises:
+            ValueError: If ``name`` is not a known scene.
+        """
+        assert self._font is not None
+        assert self._font_intro is not None
         background = Background(self.height, self._BACKGROUND_LAYERS)
         particles = ParticleSystem(
             [Snowflake(self.width, self.height) for _ in range(35)]
@@ -528,21 +707,33 @@ class Visualizer():
             ]
             return Menu(background, particles, self._font_intro, items)
         if name == 'drone':
+            zones = (
+                self.list_zones if self.list_zones is not None
+                else (config.zones if config is not None else None)
+            )
+            connections = (
+                self.list_connections if self.list_connections is not None
+                else (config.connections if config is not None else None)
+            )
+            active_scheduler = (
+                self.scheduler if self.scheduler is not None else scheduler
+            )
+            assert zones is not None
+            assert connections is not None
+            assert active_scheduler is not None
             return DroneScreen(
                 background,
                 particles,
                 self._font,
-                self.list_zones if self.list_zones is not None
-                else config.zones,
-                self.list_connections if self.list_connections is not None
-                else config.connections,
-                self.scheduler if self.scheduler is not None else scheduler,
+                zones,
+                connections,
+                active_scheduler,
                 self.width,
                 self.height,
                 drone_system
             )
         if name == 'map':
-            items = [
+            map_items = [
                 MapItem(
                     'Map 01: Linear Path',
                     './maps/easy/01_linear_path.txt', (
@@ -599,11 +790,13 @@ class Visualizer():
                 )
             ]
             return MapSelection(
-                background, particles, items, None, None, None, self._font
+                background, particles, map_items, None, None, None,
+                self._font
             )
         raise ValueError(f'Unknown scene: {name}')
 
     def run(self) -> None:
+        """Open the window and run the main loop until the user quits."""
         pg.init()
         screen = pg.display.set_mode(
             (self.width, self.height), pg.RESIZABLE | pg.SCALED
@@ -629,10 +822,7 @@ class Visualizer():
         self.scenes = [self._make_scene('intro')]
         while True:
             dt = clock.tick(60) / 1000
-            if isinstance(self.scenes[-1], tuple):
-                current, _, _ = self.scenes[-1]
-            else:
-                current = self.scenes[-1]
+            current = self.scenes[-1]
             for event in pg.event.get():
                 if event.type == pg.QUIT:
                     pg.quit()

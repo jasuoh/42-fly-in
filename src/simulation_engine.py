@@ -1,4 +1,5 @@
 #! /usr/bin/env python3
+"""Turn-by-turn simulation engine enforcing capacity and movement rules."""
 
 from .pathfinding_algorithm import Map, Graph
 from .drone_factory import Drone, status_type
@@ -8,14 +9,24 @@ LinkKey = frozenset[str]
 
 
 class SchedulerDeadlockError(Exception):
+    """Raised when no drone can advance during a turn."""
+
     def __init__(
         self, turn: int, stuck: list[tuple[int, str | None, str | None]]
     ) -> None:
+        """Create the error describing every stuck drone.
+
+        Args:
+            turn: The turn number at which the deadlock was detected.
+            stuck: For each undelivered drone, its id, current zone
+                and the zone it is waiting to enter.
+        """
         self.turn = turn
         self.stuck = stuck
         super().__init__(self._format())
 
     def _format(self) -> str:
+        """Build a human-readable multi-line deadlock report."""
         lines = [
             f"Deadlock detected at turn {self.turn}: "
             "no drone could advance."
@@ -29,11 +40,27 @@ class SchedulerDeadlockError(Exception):
 
 
 class Scheduler():
+    """Advances all drones turn by turn, enforcing zone and link capacity."""
+
     def __init__(
             self, map: Map,
             graph: Graph, drone_list: list[Drone],
             config: Config_Map
     ):
+        """Create a scheduler for a fully parsed configuration.
+
+        Args:
+            map: The drone network.
+            graph: Shortest-path search bound to ``map``.
+            drone_list: The drones to simulate, each with a precomputed
+                path.
+            config: The parsed map configuration (zones, connections,
+                start and end zone must be populated).
+        """
+        assert config.zones is not None
+        assert config.connections is not None
+        assert config.start is not None
+        assert config.end is not None
         self.map = map
         self.graph = graph
         self.drone_list: list[Drone] = drone_list
@@ -61,6 +88,7 @@ class Scheduler():
         self._fairness_threshold: int = max(1, len(self.drone_list))
 
     def _compute_turn_cap(self) -> int:
+        """Return an upper bound on turns, used to detect deadlocks."""
         longest_path = max(
             (len(d.current_path) for d in self.drone_list), default=0
         )
@@ -68,15 +96,21 @@ class Scheduler():
         return longest_path + slack + 1
 
     def _connection(self, zone_a: str, zone_b: str) -> Connection:
+        """Return the connection linking ``zone_a`` and ``zone_b``."""
         return self.connection_dict[frozenset({zone_a, zone_b})]
 
     def capacity(self, zone_name: str) -> int | None:
+        """Return the drone capacity of a zone, or None if unlimited.
+
+        The start and end zones have unlimited capacity.
+        """
         if zone_name in (self.start, self.end):
             return None
         max_drones = self.zone_dict[zone_name].max_drones
         return max_drones if max_drones is not None else 1
 
     def _can_enter(self, zone_name: str) -> bool:
+        """Return whether one more drone can enter ``zone_name`` now."""
         capacity = self.capacity(zone_name)
         if capacity is None:
             return True
@@ -85,6 +119,7 @@ class Scheduler():
         return occupied + reserved < capacity
 
     def link_usage_in_flight(self, zone_a: str, zone_b: str) -> int:
+        """Return how many drones are currently transiting this link."""
         count: int = 0
         for link, _, _ in self.in_flight.values():
             if link == frozenset({zone_a, zone_b}):
@@ -92,6 +127,17 @@ class Scheduler():
         return count
 
     def gen_turn(self) -> str:
+        """Advance the simulation by one turn.
+
+        Completes any arriving transits, then greedily moves every
+        drone that can legally advance, respecting zone and link
+        capacity and prioritizing drones that have been blocked the
+        longest.
+
+        Returns:
+            The space-separated move log for this turn, in the
+            ``D<id>-<zone>`` / ``D<id>-<connection>`` output format.
+        """
         self.current_turn += 1
         moves: list[str] = []
         link_usage: dict[LinkKey, int] = {}
@@ -159,6 +205,7 @@ class Scheduler():
         return " ".join(moves)
 
     def _stuck_drones(self) -> list[tuple[int, str | None, str | None]]:
+        """Return (id, current zone, awaited zone) for undelivered drones."""
         return [
             (d.drone_id, d.current_zone, d.peek_next())
             for d in self.drone_list
@@ -166,6 +213,15 @@ class Scheduler():
         ]
 
     def run(self) -> list[str]:
+        """Run the simulation until every drone reaches the end zone.
+
+        Returns:
+            The per-turn move log, one entry per turn.
+
+        Raises:
+            SchedulerDeadlockError: If a turn produces no moves, or the
+                turn cap is exceeded, before all drones are delivered.
+        """
         turn_log: list[str] = []
         while not all(
             drone.current_status == status_type.delivered

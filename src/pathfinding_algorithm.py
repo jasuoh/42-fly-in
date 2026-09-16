@@ -1,29 +1,65 @@
 #! /usr/bin/env python3
+"""Graph representation and shortest-path search over the drone network."""
 
 from collections.abc import Callable
-from .input_parsing import Zone, Connection, zone_types
+from .input_parsing import Zone, Connection, zone_types, Config_Map
 from heapq import heapify, heappop, heappush
 
 WeightFn = Callable[[str, 'Map.ZoneNode', 'Connection'], float]
 
 
 class CustomException(Exception):
-    def __str__(self):
+    """Raised for structural errors in the map graph."""
+
+    def __str__(self) -> str:
+        """Return the underlying exception message."""
         return super().__str__()
 
 
 class Map():
-    def __init__(self, dict_zoneNodes=None):
-        self.dict_zoneNodes: dict = dict_zoneNodes or {}
+    """The drone network as a dictionary of zone name to :class:`ZoneNode`."""
+
+    def __init__(
+        self, dict_zoneNodes: dict[str, 'Map.ZoneNode'] | None = None
+    ) -> None:
+        """Create a map, optionally wrapping an existing node dictionary.
+
+        Args:
+            dict_zoneNodes: Mapping of zone name to node. Defaults to
+                an empty map.
+        """
+        self.dict_zoneNodes: dict[str, 'Map.ZoneNode'] = dict_zoneNodes or {}
 
     class ZoneNode():
+        """A zone together with its neighboring zones and connections."""
+
         def __init__(self, zone: 'Zone'):
+            """Create a node wrapping ``zone`` with no neighbors yet.
+
+            Args:
+                zone: The zone data this node represents.
+            """
             self.zone: Zone = zone
             self.neighbor_zones: list[tuple['Map.ZoneNode', 'Connection']] = []
 
     @classmethod
-    def from_config(cls, config):
-        zoneNode_dict: dict = {}
+    def from_config(cls, config: Config_Map) -> 'Map':
+        """Build a :class:`Map` from a parsed :class:`Config_Map`.
+
+        Args:
+            config: The parsed map configuration, with zones and
+                connections already populated.
+
+        Returns:
+            The resulting map, excluding blocked zones.
+
+        Raises:
+            CustomException: If a connection references an unknown or
+                blocked zone.
+        """
+        assert config.zones is not None
+        assert config.connections is not None
+        zoneNode_dict: dict[str, 'Map.ZoneNode'] = {}
         for zone in config.zones:
             if zone.zone == zone_types.blocked:
                 continue
@@ -39,7 +75,14 @@ class Map():
 
 
 class Graph():
+    """Dijkstra-based shortest-path search over a :class:`Map`."""
+
     def __init__(self, map: Map):
+        """Wrap ``map`` for shortest-path queries.
+
+        Args:
+            map: The drone network to search over.
+        """
         self.graph = map.dict_zoneNodes
 
     @staticmethod
@@ -52,6 +95,17 @@ class Graph():
     def shortest_distance(
         self, source: str, weight_fn: WeightFn | None = None
     ) -> tuple[dict[str, float], dict[str, str]]:
+        """Run Dijkstra's algorithm from ``source``.
+
+        Args:
+            source: Name of the zone to search from.
+            weight_fn: Optional custom edge-weight function. Defaults
+                to the destination zone's movement cost.
+
+        Returns:
+            A pair of (distances, predecessors), each keyed by zone
+            name.
+        """
         weight_fn = weight_fn or self._default_weight
         distances: dict[str, float] = {
             node: float('inf') for node in self.graph
@@ -81,9 +135,25 @@ class Graph():
 
     @staticmethod
     def shortest_path(
-        start_hub: str, end_hub: str, predecessors: dict
+        start_hub: str, end_hub: str, predecessors: dict[str, str]
     ) -> list[str]:
-        path: list = []
+        """Reconstruct the shortest path from a predecessor map.
+
+        Args:
+            start_hub: Name of the starting zone.
+            end_hub: Name of the destination zone.
+            predecessors: Predecessor map produced by
+                :meth:`shortest_distance`.
+
+        Returns:
+            The zone names from (excluding) ``start_hub`` to
+            ``end_hub``, in traversal order.
+
+        Raises:
+            CustomException: If ``end_hub`` is unreachable from
+                ``start_hub``.
+        """
+        path: list[str] = []
         curr_zone = end_hub
         if end_hub not in predecessors.keys():
             raise CustomException(
