@@ -6,9 +6,10 @@ import pygame as pg
 from .drone_factory import status_type
 from .input_parsing import Connection, Zone
 from .simulation_engine import Scheduler
-from .input_parsing import input_parsing
+from .input_parsing import input_parsing, Config_Map
 from .pathfinding_algorithm import Map, Graph
 from .drone_factory import DroneFactory
+from .route_planner import RoutePlanner
 from .visual import (
     BaseScene, ParticleSystem,
     Background, Snowflake, Scene, Drone_System
@@ -458,19 +459,20 @@ class MapSelection(BaseScene):
             item.rect = label.get_rect(topleft=item.pos)
             surface.blit(label, item.pos)
 
-    def next_scene(self):
+    def next_scene(self) -> str | tuple[str, Scheduler, Config_Map] | None:
         if self._chosen is None:
             return None
         print(self._chosen.path)
         config = input_parsing(self._chosen.path)
         map = Map.from_config(config)
         graph = Graph(map)
+        planner = RoutePlanner(
+            map=map, graph=graph, start=config.start, end=config.end
+        )
         F = DroneFactory(int(config.nb_drones))
-        _, predecessors = graph.shortest_distance(config.start)
         F.get_drone_list(
-            start_hub=config.start, path=graph.shortest_path(
-                config.start, config.end, predecessors
-            )
+            start_hub=config.start,
+            paths=planner.assign_paths(int(config.nb_drones)),
         )
         return (
             self._chosen.target, Scheduler(
@@ -493,8 +495,8 @@ class Visualizer():
 
     def __init__(
         self,
-        list_zones: list[Zone],
-        list_connections: list[Connection],
+        list_zones: list[Zone] | None,
+        list_connections: list[Connection] | None,
         scheduler: Scheduler | None = None
     ) -> None:
         self.width = 1920

@@ -85,7 +85,7 @@ hub: final_torture4 19 0 [color=crimson max_drones=1]
 hub: final_torture5 20 0 [color=crimson max_drones=1]
 
 # The ultimate goal
-end_hub: impossible_goal 21 0 [color=red max_drones=25] # TODO: color change to red from rainbow since error handling in this case is not implemented yet
+end_hub: impossible_goal 21 0 [color=red max_drones=25]
 
 # === CONNECTIONS: The Web of Suffering ===
 
