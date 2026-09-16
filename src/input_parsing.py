@@ -1,17 +1,23 @@
 #! /usr/bin/env python3
+"""Parser for the Fly-In map configuration file format."""
 
-from typing import Dict
+from typing import Any
 from pydantic import BaseModel, Field, ValidationError
 from enum import Enum
 import sys
 
 
 class InvalidZoneType(Exception):
+    """Raised when a movement cost is requested for an invalid zone type."""
+
     def __str__(self) -> str:
+        """Return a fixed, human-readable error message."""
         return "Invaid Zone Type Error occured"
 
 
 class zone_types(Enum):
+    """The zone types allowed in a map configuration file."""
+
     normal = 'normal'
     blocked = 'blocked'
     restricted = 'restricted'
@@ -19,6 +25,12 @@ class zone_types(Enum):
 
     @property
     def movement_cost(self) -> int:
+        """Return the turn cost of moving into a zone of this type.
+
+        Raises:
+            InvalidZoneType: If called on the ``blocked`` zone type,
+                which can never be entered.
+        """
         match self:
             case zone_types.normal | zone_types.priority:
                 return 1
@@ -32,6 +44,8 @@ class zone_types(Enum):
 
 
 class Connection(BaseModel):
+    """A bidirectional connection between two zones."""
+
     zone_a: str = Field(...)
     zone_b: str = Field(...)
     max_link_capacity: int | None = Field(default=None, ge=0)
@@ -39,6 +53,8 @@ class Connection(BaseModel):
 
 
 class Zone(BaseModel):
+    """A single zone (hub) of the drone network."""
+
     name: str = Field(...)
     coordinates: tuple[int, int] = Field(...)
     zone: zone_types = Field(default=zone_types.normal)
@@ -47,28 +63,36 @@ class Zone(BaseModel):
 
     @property
     def cost(self) -> int:
+        """Return the turn cost of moving into this zone."""
         return self.zone.movement_cost
 
 
 class InputParsingError(Exception):
-    def __str__(self) -> None:
-        return super().__str__()
+    """Raised for any malformed content in a map configuration file."""
 
 
 class Config_Map():
-    def __init__(self):
-        self.nb_drones = None
-        self.start = None
-        self.end = None
-        self.zones = None
-        self.connections = None
-        self._value_dict = None
+    """Parsed representation of a map configuration file."""
+
+    def __init__(self) -> None:
+        """Create an empty configuration, filled by :func:`input_parsing`."""
+        self.nb_drones: str | None = None
+        self.start: str | None = None
+        self.end: str | None = None
+        self.zones: list[Zone] | None = None
+        self.connections: list[Connection] | None = None
+        self._value_dict: dict[str, Any] | None = None
 
     def _input_parsing_and_error_handling(self, path: str) -> None:
+        """Read the map file at ``path`` into a raw key/value dictionary.
+
+        Args:
+            path: Path to the map configuration file.
+        """
         allowed_keys = [
             "nb_drones", "start_hub", "end_hub", "hub", "connection"
         ]
-        value_dict: Dict = {}
+        value_dict: dict[str, Any] = {}
         value_dict["hub"] = []
         value_dict["connection"] = []
         try:
@@ -98,23 +122,27 @@ class Config_Map():
         self._value_dict = value_dict
 
     def _assign_dict_to_obj(self) -> None:
+        """Validate the raw key/value dict into typed zones/connections."""
+        assert self._value_dict is not None
         input_dict = self._value_dict
         allowed_keys_zones = ['zone', 'color', 'max_drones']
         allowed_keys_connections = ['max_link_capacity']
-        zones = []
-        connections = []
+        zones: list[Zone] = []
+        connections: list[Connection] = []
 
-        for zone in input_dict['hub']:
-            metadata_dict: Dict = {}
+        for raw_zone in input_dict['hub']:
+            metadata_dict: dict[str, Any] = {}
             try:
-                zone = zone.split(" ")
-                metadata_dict["name"] = zone[0]
-                metadata_dict["coordinates"] = (zone[1], zone[2])
+                zone_fields = raw_zone.split(" ")
+                metadata_dict["name"] = zone_fields[0]
+                metadata_dict["coordinates"] = (
+                    zone_fields[1], zone_fields[2]
+                )
             except Exception:
                 raise InputParsingError('Invalid Name or coordinates')
-            for i in range(3, len(zone)):
+            for i in range(3, len(zone_fields)):
                 try:
-                    key, value = zone[i].split('=')
+                    key, value = zone_fields[i].split('=')
                 except Exception:
                     raise InputParsingError(
                         "Inputparsing Error: Invalid key"
@@ -131,24 +159,24 @@ class Config_Map():
                 zones.append(Zone.model_validate(metadata_dict))
             except ValidationError:
                 raise InputParsingError("Error with validating data for Zone")
-        for connection in input_dict['connection']:
+        for raw_connection in input_dict['connection']:
             metadata_dict = {}
             try:
-                if connection.count('-') > 1:
+                if raw_connection.count('-') > 1:
                     raise InputParsingError(
-                        f"Invalid connection syntax for {connection}"
+                        f"Invalid connection syntax for {raw_connection}"
                     )
-                connection = connection.split(" ")
-                connection_path = connection[0].split('-')
+                connection_fields = raw_connection.split(" ")
+                connection_path = connection_fields[0].split('-')
                 metadata_dict['zone_a'] = connection_path[0]
                 metadata_dict['zone_b'] = connection_path[1]
             except Exception:
                 raise InputParsingError(
-                    f"Invalid connection syntax for {connection} "
+                    f"Invalid connection syntax for {raw_connection} "
                 )
-            for i in range(1, len(connection)):
+            for i in range(1, len(connection_fields)):
                 try:
-                    key, value = connection[i].split('=')
+                    key, value = connection_fields[i].split('=')
                 except Exception:
                     raise InputParsingError(
                         "Invalid key, value syntax for metadata"
@@ -173,11 +201,26 @@ class Config_Map():
         except Exception:
             raise InputParsingError("Error with parsing into Config Model")
 
-    def validation_after_creation(self):
+    def validation_after_creation(self) -> None:
+        """Validate the fully parsed configuration.
+
+        Not yet implemented.
+        """
         ...  # TODO: validation for map file after checking each line
 
 
-def input_parsing(path: str):
+def input_parsing(path: str) -> Config_Map:
+    """Parse the map configuration file at ``path``.
+
+    Args:
+        path: Path to the map configuration file.
+
+    Returns:
+        The fully parsed configuration.
+
+    On any parsing error, an error message is printed and the process
+    exits with status 1.
+    """
     config = Config_Map()
     try:
         config._input_parsing_and_error_handling(path=path)
