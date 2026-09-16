@@ -40,19 +40,26 @@ class Scheduler():
     def _connection(self, zone_a: str, zone_b: str) -> Connection:
         return self.connection_dict[frozenset({zone_a, zone_b})]
 
-    def _capacity(self, zone_name: str) -> int | None:
+    def capacity(self, zone_name: str) -> int | None:
         if zone_name in (self.start, self.end):
             return None
         max_drones = self.zone_dict[zone_name].max_drones
         return max_drones if max_drones is not None else 1
 
     def _can_enter(self, zone_name: str) -> bool:
-        capacity = self._capacity(zone_name)
+        capacity = self.capacity(zone_name)
         if capacity is None:
             return True
         occupied = self.zone_occupancy.get(zone_name, 0)
         reserved = self.zone_reserved.get(zone_name, 0)
         return occupied + reserved < capacity
+
+    def link_usage_in_flight(self, zone_a: str, zone_b: str) -> int:
+        count: int = 0
+        for link, _, _ in self.in_flight.values():
+            if link == frozenset({zone_a, zone_b}):
+                count += 1
+        return count
 
     def gen_turn(self) -> str:
         self.current_turn += 1

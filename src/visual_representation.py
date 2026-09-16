@@ -157,10 +157,35 @@ class DroneScreen(BaseScene):
         self.height = screen_height
         self.dronesystem = dronesystem
         self._screen_positions = None
+        self._zone_capacities: dict[str, int] = {
+            zone.name: cap
+            for zone in list_zones
+            if (cap := self.scheduler.capacity(zone.name)) is not None
+        }
+        self._link_capacities: dict[tuple[str, str], int] = {
+            (con.zone_a, con.zone_b): con.max_link_capacity
+            for con in list_connections
+            if con.max_link_capacity is not None
+        }
         self.zone_positions = self._calculate_margin(list_zones)
         self._static_surface = self._draw_static_surface(
             list_zones, list_connections
         )
+        self._connection_midpoints: dict[
+            tuple[str, str], tuple[float, float]
+        ] = {
+            (zone_a, zone_b): (
+                (
+                    self._screen_positions[zone_a][0]
+                    + self._screen_positions[zone_b][0]
+                ) * 0.5,
+                (
+                    self._screen_positions[zone_a][1]
+                    + self._screen_positions[zone_b][1]
+                ) * 0.5,
+            )
+            for zone_a, zone_b in self._link_capacities
+        }
         self._prev_positions = self._capture_positions()
         self._target_positions = self._prev_positions
 
@@ -182,9 +207,6 @@ class DroneScreen(BaseScene):
                 2 * self.padding_x - 25, 5 * self.padding_y - 25
             ), 3, 3
         )
-
-    def _draw_infos(self):
-        ...  # TODO: draw infos for each drone on hover
 
     def _draw_legend(self, surface: pg.Surface) -> None:
         label = self.font.render(
@@ -352,6 +374,25 @@ class DroneScreen(BaseScene):
                     self.height - 5 * self.padding_y
                 )
             )
+        self._draw_capacities(surface)
+
+    def _draw_capacities(self, surface: pg.Surface) -> None:
+        for name, cap in self._zone_capacities.items():
+            pos = self._screen_positions[name]
+            occupancy = self.scheduler.zone_occupancy.get(name, 0)
+            label = self.font.render(
+                f"{occupancy}/{cap}", True, 'White'
+            )
+            label_rect = label.get_rect(center=(pos[0], pos[1] + 75))
+            surface.blit(label, label_rect)
+        for (zone_a, zone_b), cap in self._link_capacities.items():
+            (x, y) = self._connection_midpoints[(zone_a, zone_b)]
+            usage = self.scheduler.link_usage_in_flight(zone_a, zone_b)
+            label = self.font.render(
+                f"{usage}/{cap}", True, 'White'
+            )
+            label_rect = label.get_rect(center=(x, y + 25))
+            surface.blit(label, label_rect)
 
     def next_scene(self) -> str | None:
         if self.end and self.scheduler:
@@ -370,6 +411,7 @@ class MapItem():
         self.path = path
         self.pos = pos
         self.target = target
+        self.rect: pg.Rect | None = None
 
 
 class MapSelection(BaseScene):
@@ -397,7 +439,7 @@ class MapSelection(BaseScene):
         elif event.type == pg.MOUSEBUTTONDOWN:
             item = self.maps[self.target]
             if item.rect and item.rect.collidepoint(event.pos):
-                self._chosen = item.target
+                self._chosen = self.maps[self.target]
         elif event.type == pg.KEYDOWN:
             if event.key == pg.K_DOWN:
                 self.target = (self.target + 1) % len(self.maps)
@@ -419,6 +461,7 @@ class MapSelection(BaseScene):
     def next_scene(self):
         if self._chosen is None:
             return None
+        print(self._chosen.path)
         config = input_parsing(self._chosen.path)
         map = Map.from_config(config)
         graph = Graph(map)
