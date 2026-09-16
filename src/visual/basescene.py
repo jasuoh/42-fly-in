@@ -3,6 +3,8 @@
 from abc import ABC, abstractmethod
 from .background import Background
 from .particle import ParticleSystem
+from ..simulation_engine import Scheduler
+from ..input_parsing import Config_Map
 import pygame as pg
 
 
@@ -19,7 +21,7 @@ class Scene(ABC):
     def draw(self, surface: pg.Surface) -> None:
         pass
 
-    def next_scene(self) -> str | None:
+    def next_scene(self) -> str | tuple[str, Scheduler, Config_Map] | None:
         return None
 
 

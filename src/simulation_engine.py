@@ -7,6 +7,27 @@ from .input_parsing import Config_Map, Connection, Zone, zone_types
 LinkKey = frozenset[str]
 
 
+class SchedulerDeadlockError(Exception):
+    def __init__(
+        self, turn: int, stuck: list[tuple[int, str | None, str | None]]
+    ) -> None:
+        self.turn = turn
+        self.stuck = stuck
+        super().__init__(self._format())
+
+    def _format(self) -> str:
+        lines = [
+            f"Deadlock detected at turn {self.turn}: "
+            "no drone could advance."
+        ]
+        for drone_id, current_zone, waiting_for in self.stuck:
+            lines.append(
+                f"  Drone {drone_id}: at {current_zone}, "
+                f"waiting to enter {waiting_for}"
+            )
+        return "\n".join(lines)
+
+
 class Scheduler():
     def __init__(
             self, map: Map,
@@ -36,6 +57,15 @@ class Scheduler():
             name: 0 for name in self.zone_dict
         }
         self.in_flight: dict[int, tuple[LinkKey, str, int]] = {}
+        self._turn_cap: int = self._compute_turn_cap()
+        self._fairness_threshold: int = max(1, len(self.drone_list))
+
+    def _compute_turn_cap(self) -> int:
+        longest_path = max(
+            (len(d.current_path) for d in self.drone_list), default=0
+        )
+        slack = len(self.zone_dict) * len(self.drone_list)
+        return longest_path + slack + 1
 
     def _connection(self, zone_a: str, zone_b: str) -> Connection:
         return self.connection_dict[frozenset({zone_a, zone_b})]
@@ -87,7 +117,10 @@ class Scheduler():
                 if d.current_status == status_type.can_move
                 and d.drone_id not in just_landed
             ),
-            key=lambda d: len(d.current_path),
+            key=lambda d: (
+                0 if d.blocked_turns >= self._fairness_threshold else 1,
+                len(d.current_path),
+            ),
         )
         for drone in movable:
             assert drone.current_zone is not None
@@ -97,10 +130,12 @@ class Scheduler():
             link = frozenset({source, next_zone_name})
             link_capacity = connection.max_link_capacity or 1
             if link_usage.get(link, 0) >= link_capacity:
+                drone.mark_blocked()
                 continue
             next_zone = self.zone_dict[next_zone_name]
             if next_zone.zone == zone_types.restricted:
                 if not self._can_enter(next_zone_name):
+                    drone.mark_blocked()
                     continue
                 self.zone_occupancy[source] -= 1
                 self.zone_reserved[next_zone_name] += 1
@@ -112,6 +147,7 @@ class Scheduler():
                 moves.append(f"D{drone.drone_id}-{source}-{next_zone_name}")
             else:
                 if not self._can_enter(next_zone_name):
+                    drone.mark_blocked()
                     continue
                 self.zone_occupancy[source] -= 1
                 self.zone_occupancy[next_zone_name] = (
@@ -122,11 +158,23 @@ class Scheduler():
                 moves.append(f"D{drone.drone_id}-{next_zone_name}")
         return " ".join(moves)
 
+    def _stuck_drones(self) -> list[tuple[int, str | None, str | None]]:
+        return [
+            (d.drone_id, d.current_zone, d.peek_next())
+            for d in self.drone_list
+            if d.current_status != status_type.delivered
+        ]
+
     def run(self) -> list[str]:
         turn_log: list[str] = []
         while not all(
             drone.current_status == status_type.delivered
             for drone in self.drone_list
         ):
-            turn_log.append(self.gen_turn())
+            moves = self.gen_turn()
+            turn_log.append(moves)
+            if not moves or self.current_turn >= self._turn_cap:
+                raise SchedulerDeadlockError(
+                    self.current_turn, self._stuck_drones()
+                )
         return turn_log

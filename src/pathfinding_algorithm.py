@@ -1,7 +1,10 @@
 #! /usr/bin/env python3
 
+from collections.abc import Callable
 from .input_parsing import Zone, Connection, zone_types
 from heapq import heapify, heappop, heappush
+
+WeightFn = Callable[[str, 'Map.ZoneNode', 'Connection'], float]
 
 
 class CustomException(Exception):
@@ -39,25 +42,41 @@ class Graph():
     def __init__(self, map: Map):
         self.graph = map.dict_zoneNodes
 
-    def shortest_distance(self, source: str):
-        distances = {node: float('inf') for node in self.graph}
-        predecessors = {node: node for node in self.graph}
+    @staticmethod
+    def _default_weight(
+        current: str, neighbor: 'Map.ZoneNode', connection: 'Connection'
+    ) -> float:
+        """Default edge weight: the destination zone's movement cost."""
+        return float(neighbor.zone.cost)
+
+    def shortest_distance(
+        self, source: str, weight_fn: WeightFn | None = None
+    ) -> tuple[dict[str, float], dict[str, str]]:
+        weight_fn = weight_fn or self._default_weight
+        distances: dict[str, float] = {
+            node: float('inf') for node in self.graph
+        }
+        predecessors: dict[str, str] = {node: node for node in self.graph}
         distances[source] = 0
 
-        pq = [(0, source)]
+        pq: list[tuple[float, str]] = [(0, source)]
         heapify(pq)
-        visited = set()
+        visited: set[str] = set()
         while pq:
             current_distance, current_node = heappop(pq)
             if current_node in visited:
                 continue
             visited.add(current_node)
-            for neighbor in self.graph[current_node].neighbor_zones:
-                calc_val = current_distance + neighbor[0].zone.cost
-                if calc_val < distances[neighbor[0].zone.name]:
-                    distances[neighbor[0].zone.name] = calc_val
-                    predecessors[neighbor[0].zone.name] = current_node
-                    heappush(pq, (calc_val, neighbor[0].zone.name))
+            for neighbor_node, connection in (
+                self.graph[current_node].neighbor_zones
+            ):
+                calc_val = current_distance + weight_fn(
+                    current_node, neighbor_node, connection
+                )
+                if calc_val < distances[neighbor_node.zone.name]:
+                    distances[neighbor_node.zone.name] = calc_val
+                    predecessors[neighbor_node.zone.name] = current_node
+                    heappush(pq, (calc_val, neighbor_node.zone.name))
         return distances, predecessors
 
     @staticmethod
