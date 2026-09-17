@@ -30,6 +30,24 @@ This collection contains carefully crafted maps designed to test different aspec
 
 > 🏆 **CHALLENGE RECORD**: The reference implementation solves "The Impossible Dream" in **41 turns**. Can you beat this record? This serves as a benchmark for algorithmic optimization and provides a concrete goal for advanced implementations.
 
+### 🟣 Critical Maps
+**Target**: Correctness on the specific rule interactions that are easiest to get subtly wrong
+- `01_restricted_gate_contention.txt` - two staging zones feeding one restricted zone (capacity reservation across connections)
+- `02_conveyor_chain.txt` - single-file capacity-1 tunnel (same-turn vacate/enter rule)
+- `03_link_vs_zone_capacity.txt` - connection capacity as the real bottleneck, in parallel with a bypass route
+- `04_symmetric_deadlock_risk.txt` - two symmetric arms contending for one restricted zone (joint destination-capacity checking)
+
+Each map isolates exactly one mechanic from the subject's mandatory
+part, so a wrong result points straight at the bug. See
+[`critical/README.md`](critical/README.md) for a full explanation of
+what each map tests and why it matters.
+
+### 🧪 Extra Maps
+**Target**: Targeted mechanic checks and parser edge cases, on top of the graded difficulty tiers
+- `01_complex_maze.txt` through `04_simple_fork_two_paths.txt` - assorted hand-built scenarios
+- `05_single_capacity_choke.txt` through `14_shorter_path_preference.txt` - focused, single-mechanic checks (chokepoints, oscillation, priority tie-breaks, dead-end decoys, equal/shorter path preference, high-capacity sanity checks, ...)
+- [`invalid/`](invalid/README.md) - deliberately malformed or rule-violating map files, for testing that the parser fails cleanly with a clear, line-specific error instead of crashing or misbehaving
+
 ## Challenge Types Covered
 
 ### 🎯 **Dead End Traps**
@@ -60,6 +78,8 @@ Cycles in the graph that can cause infinite loops in poorly designed algorithms.
 2. **Progress to Medium**: Test algorithm robustness
 3. **Challenge with Hard**: Stress test optimization and edge cases
 4. **Ultimate Test**: `03_ultimate_challenge.txt` combines all difficulties
+5. **Isolate with Critical**: If a hard/ultimate map fails or scores badly, run the `critical/` maps to find out which specific rule (restricted-zone reservation, same-turn capacity hand-off, connection vs. zone capacity, joint destination contention) is the actual culprit
+6. **Validate with Extra**: Run the `extra/invalid/` maps to confirm the parser rejects malformed input with a clear error instead of crashing
 
 ## Expected Behavior
 

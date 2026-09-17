@@ -654,8 +654,8 @@ class Visualizer():
                 command line, or None to let the user pick one from
                 the menu.
         """
-        self.width = 1400
-        self.height = 800
+        self.width = 1920
+        self.height = 1080
         self.list_zones = list_zones
         self.list_connections = list_connections
         self.scheduler = scheduler
