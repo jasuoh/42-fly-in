@@ -400,7 +400,7 @@ class DroneScreen(BaseScene):
         self.current_turn = self.scheduler.gen_turn()
         self._target_positions = self._capture_positions()
         if not self._finished:
-                    print(self.current_turn)
+            print(self.current_turn)
         self._finished = all(
             drone.current_status == status_type.delivered
             for drone in self.scheduler.drone_list
