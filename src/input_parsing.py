@@ -39,7 +39,7 @@ class zone_types(Enum):
             case zone_types.blocked:
                 raise InvalidZoneType(
                     'Error in calculating the Zone Cost,'
-                    'no Zone cost for restricted Zone!'
+                    'no Zone cost for blocked Zone!'
                 )
 
 
@@ -90,6 +90,8 @@ class Config_Map():
         self.connections: list[Connection] | None = None
         self._value_dict: dict[str, Any] | None = None
         self.path: str | None = None
+        self.connection_lines: dict | None = None
+        self.zones_lines: dict | None = None
 
     def _input_parsing_and_error_handling(self, path: str) -> None:
         """Read the map file at ``path`` into a raw key/value dictionary.
@@ -174,6 +176,7 @@ class Config_Map():
         zones: list[Zone] = []
         connections: list[Connection] = []
         zone_lines: dict[str, int] = {}
+        connection_lines: dict[frozenset[str], int] = {}
 
         for line_no, raw_zone in input_dict['hub']:
             metadata_dict: dict[str, Any] = {}
@@ -255,12 +258,20 @@ class Config_Map():
                     key.strip().replace("[", '')
                 ] = value.strip().replace(']', '')
             try:
-                connections.append(Connection.model_validate(metadata_dict))
+                connection = Connection.model_validate(metadata_dict)
             except ValidationError:
                 raise InputParsingError(
                     self.path, line_no,
-                    "Nice Error message"
+                    "Error: Invalid Connection"
                 )
+            if frozenset((connection.zone_a, connection.zone_b)) in connection_lines:
+                raise InputParsingError(
+                    path, line_no,
+                    f'Error: Connection "{connection.zone_a, connection.zone_b}"'
+                    f"already defindet on {connection_lines[frozenset((connection.zone_a, connection.zone_b))]}"
+                )
+            connection_lines[frozenset((connection.zone_a, connection.zone_b))] = line_no
+            connections.append(connection)
         try:
             self.start = input_dict['start_hub']
             self.end = input_dict['end_hub']
@@ -272,6 +283,20 @@ class Config_Map():
                 path, line_no,
                 "Invalid Config File, missing parts"
             )
+        self.connection_lines = connection_lines
+        self.zones_lines = zone_lines
+
+
+    def _after_validation_check(self):
+        start = self.start
+        for zone in self.zones:
+            if zone.name == start:
+                if zone.max_drones < self.nb_drones:
+                    line_no = self.zones_lines[zone.name]
+                    raise InputParsingError(
+                        self.path, line_no,
+                        f'Error: {zone.name} has less capacity for {self.nb_drones} drones'
+                    )
 
 
 def input_parsing(path: str) -> Config_Map:
@@ -290,6 +315,7 @@ def input_parsing(path: str) -> Config_Map:
     try:
         config._input_parsing_and_error_handling(path=path)
         config._assign_dict_to_obj()
+        config._after_validation_check()
     except BaseException as e:
         print(e, file=sys.stderr)
         sys.exit(1)

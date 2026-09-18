@@ -74,7 +74,8 @@ class Map():
                 )
             node_a.neighbor_zones.append((node_b, connection))
             node_b.neighbor_zones.append((node_a, connection))
-        if config.start not in zoneNode_dict or config.end not in zoneNode_dict:
+        if (config.start not in zoneNode_dict
+                or config.end not in zoneNode_dict):
             raise CustomException(
                 'Invalid config file: start or end zone is missing or blocked'
             )
