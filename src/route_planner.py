@@ -46,10 +46,12 @@ class RoutePlanner():
         """
         paths: list[list[str]] = []
         for _ in range(drone_count):
-            _, predecessors = self.graph.shortest_distance(
+            distances, predecessors = self.graph.shortest_distance(
                 self.start, self._weight
             )
-            path = Graph.shortest_path(self.start, self.end, predecessors)
+            path = Graph.shortest_path(
+                self.start, self.end, distances, predecessors
+            )
             self._reserve(path)
             paths.append(path)
         return paths

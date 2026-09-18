@@ -48,7 +48,7 @@ class Connection(BaseModel):
 
     zone_a: str = Field(...)
     zone_b: str = Field(...)
-    max_link_capacity: int | None = Field(default=None, ge=0)
+    max_link_capacity: int | None = Field(default=None, gt=0)
     color: str = Field(default='White')
 
 
@@ -58,7 +58,7 @@ class Zone(BaseModel):
     name: str = Field(...)
     coordinates: tuple[int, int] = Field(...)
     zone: zone_types = Field(default=zone_types.normal)
-    max_drones: int | None = Field(default=None, ge=0)
+    max_drones: int | None = Field(default=None, gt=0)
     color: str = Field(default='Red')
 
     @property
@@ -122,6 +122,11 @@ class Config_Map():
                     f"Invalid Argument for Map-file: {key.strip()}"
                 )
             if key.strip() in ['start_hub', 'end_hub']:
+                if value_dict.get(key.strip()) is not None:
+                    raise InputParsingError(
+                        path, line_no,
+                        f'Error: {key.strip()} should be defined once'
+                    )
                 value_dict['hub'].append((line_no, value.strip()))
                 value_dict[key.strip()] = value.strip().split(' ')[0]
             elif key.strip() not in ["hub", "connection"]:
@@ -168,6 +173,7 @@ class Config_Map():
         allowed_keys_connections = ['max_link_capacity']
         zones: list[Zone] = []
         connections: list[Connection] = []
+        zone_lines: dict[str, int] = {}
 
         for line_no, raw_zone in input_dict['hub']:
             metadata_dict: dict[str, Any] = {}
@@ -199,12 +205,20 @@ class Config_Map():
                     key.strip().replace("[", '')
                 ] = value.strip().replace(']', '')
             try:
-                zones.append(Zone.model_validate(metadata_dict))
+                zone = Zone.model_validate(metadata_dict)
             except ValidationError:
                 raise InputParsingError(
                     path, line_no,
                     "Error with validating data for Zone"
                 )
+            if zone.name in zone_lines:
+                raise InputParsingError(
+                    path, line_no,
+                    f'Error: zone "{zone.name}" already defined on line '
+                    f'{zone_lines[zone.name]}'
+                )
+            zone_lines[zone.name] = line_no
+            zones.append(zone)
         for line_no, raw_connection in input_dict['connection']:
             metadata_dict = {}
             try:

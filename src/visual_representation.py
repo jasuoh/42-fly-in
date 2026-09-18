@@ -8,7 +8,7 @@ from .drone_factory import Drone, status_type
 from .input_parsing import Connection, Zone
 from .simulation_engine import Scheduler
 from .input_parsing import input_parsing, Config_Map
-from .pathfinding_algorithm import Map, Graph
+from .pathfinding_algorithm import Map, Graph, CustomException
 from .drone_factory import DroneFactory
 from .route_planner import RoutePlanner
 from .visual import (
@@ -605,15 +605,20 @@ class MapSelection(BaseScene):
         assert config.start is not None
         assert config.end is not None
         assert config.nb_drones is not None
-        map = Map.from_config(config)
-        graph = Graph(map)
-        planner = RoutePlanner(
-            map=map, graph=graph, start=config.start, end=config.end
-        )
+        try:
+            map = Map.from_config(config)
+            graph = Graph(map)
+            planner = RoutePlanner(
+                map=map, graph=graph, start=config.start, end=config.end
+            )
+            paths = planner.assign_paths(int(config.nb_drones))
+        except CustomException as e:
+            print(e, file=sys.stderr)
+            sys.exit(1)
         F = DroneFactory(int(config.nb_drones))
         F.get_drone_list(
             start_hub=config.start,
-            paths=planner.assign_paths(int(config.nb_drones)),
+            paths=paths,
         )
         return (
             self._chosen.target, Scheduler(

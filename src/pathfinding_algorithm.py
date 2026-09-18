@@ -55,7 +55,8 @@ class Map():
 
         Raises:
             CustomException: If a connection references an unknown or
-                blocked zone.
+                blocked zone, or if the start/end zone is missing or
+                blocked.
         """
         assert config.zones is not None
         assert config.connections is not None
@@ -68,9 +69,15 @@ class Map():
             node_a = zoneNode_dict.get(connection.zone_a)
             node_b = zoneNode_dict.get(connection.zone_b)
             if not node_a or not node_b:
-                raise CustomException('Invalid Connection Node/Zone')
+                raise CustomException(
+                    'Invalid Connection Node/Zone'
+                )
             node_a.neighbor_zones.append((node_b, connection))
             node_b.neighbor_zones.append((node_a, connection))
+        if config.start not in zoneNode_dict or config.end not in zoneNode_dict:
+            raise CustomException(
+                'Invalid config file: start or end zone is missing or blocked'
+            )
         return cls(dict_zoneNodes=zoneNode_dict)
 
 
@@ -135,13 +142,18 @@ class Graph():
 
     @staticmethod
     def shortest_path(
-        start_hub: str, end_hub: str, predecessors: dict[str, str]
+        start_hub: str,
+        end_hub: str,
+        distances: dict[str, float],
+        predecessors: dict[str, str],
     ) -> list[str]:
         """Reconstruct the shortest path from a predecessor map.
 
         Args:
             start_hub: Name of the starting zone.
             end_hub: Name of the destination zone.
+            distances: Distance map produced by :meth:`shortest_distance`,
+                used to detect unreachable destinations.
             predecessors: Predecessor map produced by
                 :meth:`shortest_distance`.
 
@@ -153,12 +165,12 @@ class Graph():
             CustomException: If ``end_hub`` is unreachable from
                 ``start_hub``.
         """
-        path: list[str] = []
-        curr_zone = end_hub
-        if end_hub not in predecessors.keys():
+        if distances.get(end_hub, float('inf')) == float('inf'):
             raise CustomException(
                 'Invalid config file: No valid path from start to endhub'
             )
+        path: list[str] = []
+        curr_zone = end_hub
         while curr_zone != start_hub:
             path.append(curr_zone)
             curr_zone = predecessors[curr_zone]
