@@ -370,8 +370,19 @@ class DroneScreen(BaseScene):
         return surface
 
     def tint(self, surface: pg.Surface, color: str) -> pg.Surface:
-        """Return a copy of ``surface`` multiplied by ``color``."""
-        parsed_color = pg.Color(color)
+        """Return a copy of ``surface`` multiplied by ``color``.
+
+        An unknown color name does not abort the visualization: a warning
+        is printed and the surface is left untinted.
+        """
+        try:
+            parsed_color = pg.Color(color)
+        except ValueError:
+            print(
+                f"Warning: unknown color '{color}', using the default",
+                file=sys.stderr
+            )
+            parsed_color = pg.Color('White')
         s = surface.copy()
         s.fill(parsed_color, special_flags=pg.BLEND_RGBA_MULT)
         return s

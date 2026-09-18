@@ -78,6 +78,78 @@ class InputParsingError(Exception):
         super().__init__(f"{path}:{line}: {message}")
 
 
+def _describe_validation_error(error: ValidationError, subject: str) -> str:
+    """Build a readable message from the first pydantic validation error.
+
+    Args:
+        error: The validation error raised by a pydantic model.
+        subject: What was being validated, e.g. ``"zone"``.
+
+    Returns:
+        A message naming the offending field, the reason and the value.
+    """
+    first = error.errors()[0]
+    field = str(first['loc'][0]) if first['loc'] else subject
+    return (
+        f'Invalid {subject} definition: "{field}": {first["msg"]} '
+        f'(got {first["input"]!r})'
+    )
+
+
+def _split_metadata(
+    path: str | None, line_no: int, text: str, allowed: list[str]
+) -> tuple[list[str], dict[str, str]]:
+    """Split a definition into its plain fields and its metadata block.
+
+    The optional block has the form ``[key=value key=value ...]``. There
+    can be only one block, it must be closed and it must end the line.
+
+    Args:
+        path: Path of the map file, for error messages.
+        line_no: Line of the definition, for error messages.
+        text: The definition without its ``hub:``/``connection:`` prefix.
+        allowed: The metadata keys that are valid for this definition.
+
+    Returns:
+        The fields before the block and the key/value pairs inside it.
+
+    Raises:
+        InputParsingError: If the brackets or the key/value pairs are
+            malformed, or a key is unknown or given twice.
+    """
+    def fail(message: str) -> InputParsingError:
+        return InputParsingError(path, line_no, message)
+
+    opening, closing = text.find('['), text.find(']')
+    if opening == -1 and closing == -1:
+        return text.split(), {}
+    if text.count('[') > 1 or text.count(']') > 1:
+        raise fail('Only one metadata block [key=value ...] is allowed')
+    if closing == -1:
+        raise fail("Metadata block is not closed: missing ']'")
+    if opening == -1:
+        raise fail("Unexpected ']' without a matching '['")
+    if closing < opening:
+        raise fail("Unexpected ']' before '['")
+    trailing = text[closing + 1:].strip()
+    if trailing:
+        raise fail(f'Unexpected text after ]: "{trailing}"')
+    metadata: dict[str, str] = {}
+    for token in text[opening + 1:closing].split():
+        key, separator, value = token.partition('=')
+        if not separator or not key or '=' in value:
+            raise fail(f'Invalid metadata "{token}": expected key=value')
+        if key not in allowed:
+            raise fail(
+                f'Invalid metadata key "{key}" '
+                f'(allowed: {", ".join(allowed)})'
+            )
+        if key in metadata:
+            raise fail(f'Metadata key "{key}" is given twice')
+        metadata[key] = value
+    return text[:opening].split(), metadata
+
+
 class Config_Map():
     """Parsed representation of a map configuration file."""
 
@@ -90,7 +162,6 @@ class Config_Map():
         self.connections: list[Connection] | None = None
         self._value_dict: dict[str, Any] | None = None
         self.path: str | None = None
-        self.connection_lines: dict[frozenset[str], int] | None = None
         self.zones_lines: dict[str, int] | None = None
 
     def _input_parsing_and_error_handling(self, path: str) -> None:
@@ -109,6 +180,7 @@ class Config_Map():
         value_dict["connection"] = []
         with open(path) as f:
             data = f.read()
+        first_line_seen = False
         for line_no, line in enumerate(data.splitlines(), start=1):
             if not line or line.startswith("#"):
                 continue
@@ -123,6 +195,13 @@ class Config_Map():
                     path, line_no,
                     f"Invalid Argument for Map-file: {key.strip()}"
                 )
+            if not first_line_seen:
+                first_line_seen = True
+                if key.strip() != 'nb_drones':
+                    raise InputParsingError(
+                        path, line_no,
+                        'The first line must define nb_drones'
+                    )
             if key.strip() in ['start_hub', 'end_hub']:
                 if value_dict.get(key.strip()) is not None:
                     raise InputParsingError(
@@ -130,7 +209,7 @@ class Config_Map():
                         f'Error: {key.strip()} should be defined once'
                     )
                 value_dict['hub'].append((line_no, value.strip()))
-                value_dict[key.strip()] = value.strip().split(' ')[0]
+                value_dict[key.strip()] = (value.split() or [''])[0]
             elif key.strip() not in ["hub", "connection"]:
                 try:
                     nb_drones_value = int(value.strip())
@@ -138,9 +217,11 @@ class Config_Map():
                     raise InputParsingError(
                         path, line_no, 'Number of Drones should be int'
                     )
-                if nb_drones_value < 1 or nb_drones_value > 9999:
+                if nb_drones_value < 1:
                     raise InputParsingError(
-                        path, line_no, 'Invalid value for number of drones'
+                        path, line_no,
+                        'Number of drones must be a positive integer, '
+                        f'got {nb_drones_value}'
                     )
                 if value_dict.get(key.strip()) is not None:
                     raise InputParsingError(
@@ -179,155 +260,123 @@ class Config_Map():
         connection_lines: dict[frozenset[str], int] = {}
 
         for line_no, raw_zone in input_dict['hub']:
-            metadata_dict: dict[str, Any] = {}
-            try:
-                zone_fields = raw_zone.split(" ")
-                metadata_dict["name"] = zone_fields[0]
-                metadata_dict["coordinates"] = (
-                    zone_fields[1], zone_fields[2]
-                )
-            except Exception:
+            fields, metadata = _split_metadata(
+                path, line_no, raw_zone, allowed_keys_zones
+            )
+            if len(fields) < 3:
                 raise InputParsingError(
-                    path, line_no, 'Invalid Name or coordinates'
+                    path, line_no,
+                    f'Invalid zone definition "{raw_zone}": '
+                    'expected <name> <x> <y> [metadata]'
                 )
-            for i in range(3, len(zone_fields)):
-                try:
-                    key, value = zone_fields[i].split('=')
-                except Exception:
-                    raise InputParsingError(
-                        path, line_no,
-                        "Inputparsing Error: Invalid key"
-                    )
-                if key.strip().replace('[', '') not in allowed_keys_zones:
-                    raise InputParsingError(
-                        self.path, line_no,
-                        f'Inputparsing Error: "{key.strip().replace("[", "")}"'
-                        ' is invalid!'
-                    )
-                metadata_dict[
-                    key.strip().replace("[", '')
-                ] = value.strip().replace(']', '')
+            if len(fields) > 3:
+                raise InputParsingError(
+                    path, line_no,
+                    f'Unexpected text "{" ".join(fields[3:])}" in the zone '
+                    'definition (metadata must be enclosed in [ ])'
+                )
+            if '-' in fields[0]:
+                raise InputParsingError(
+                    path, line_no,
+                    f'Invalid zone name "{fields[0]}": '
+                    'zone names must not contain dashes'
+                )
+            metadata_dict: dict[str, Any] = {
+                "name": fields[0], "coordinates": (fields[1], fields[2]),
+                **metadata
+            }
             try:
                 zone = Zone.model_validate(metadata_dict)
-            except ValidationError:
+            except ValidationError as error:
                 raise InputParsingError(
-                    path, line_no,
-                    "Error with validating data for Zone"
+                    path, line_no, _describe_validation_error(error, 'zone')
                 )
-            if zone.name in zone_lines.keys():
+            if zone.name in zone_lines:
                 raise InputParsingError(
                     path, line_no,
-                    f'Error: zone "{zone.name}" already defined on line '
+                    f'Zone "{zone.name}" is already defined on line '
                     f'{zone_lines[zone.name]}'
                 )
             zone_lines[zone.name] = line_no
             zones.append(zone)
         for line_no, raw_connection in input_dict['connection']:
-            metadata_dict = {}
-            try:
-                if raw_connection.count('-') > 1:
-                    raise InputParsingError(
-                        self.path, line_no,
-                        f"Invalid connection syntax for {raw_connection}"
-                    )
-                connection_fields = raw_connection.split(" ")
-                connection_path = connection_fields[0].split('-')
-                metadata_dict['zone_a'] = connection_path[0]
-                metadata_dict['zone_b'] = connection_path[1]
-            except Exception:
-                raise InputParsingError(
-                    self.path, line_no,
-                    f"Invalid connection syntax for {raw_connection} "
-                )
-            for i in range(1, len(connection_fields)):
-                try:
-                    key, value = connection_fields[i].split('=')
-                except Exception:
-                    raise InputParsingError(
-                        self.path, line_no,
-                        "Invalid key, value syntax for metadata"
-                    )
-                if key.strip().replace(
-                    "[", ''
-                ) not in allowed_keys_connections:
-                    raise InputParsingError(
-                        self.path, line_no,
-                        "Invalid key for metadata"
-                    )
-                metadata_dict[
-                    key.strip().replace("[", '')
-                ] = value.strip().replace(']', '')
-            try:
-                connection = Connection.model_validate(metadata_dict)
-            except ValidationError:
-                raise InputParsingError(
-                    self.path, line_no,
-                    "Error: Invalid Connection"
-                )
-            if frozenset(
-                (connection.zone_a, connection.zone_b)
-            ) in connection_lines.keys():
+            fields, metadata = _split_metadata(
+                path, line_no, raw_connection, allowed_keys_connections
+            )
+            if len(fields) > 1:
                 raise InputParsingError(
                     path, line_no,
-                    f'Error: Connection "{
-                        connection.zone_a, connection.zone_b
-                        }"'
-                    f" already definded in line {
-                        connection_lines[
-                            frozenset((connection.zone_a, connection.zone_b))
-                        ]
-                    }"
+                    f'Unexpected text "{" ".join(fields[1:])}" in the '
+                    'connection (metadata must be enclosed in [ ])'
                 )
-            connection_lines[
-                frozenset((connection.zone_a, connection.zone_b))
-            ] = line_no
+            name_pair = fields[0] if fields else ''
+            endpoints = name_pair.split('-')
+            if len(endpoints) != 2 or not all(endpoints):
+                raise InputParsingError(
+                    path, line_no,
+                    f'Invalid connection "{name_pair}": expected '
+                    '<zone1>-<zone2> (zone names must not contain dashes)'
+                )
+            zone_a, zone_b = endpoints
+            if zone_a == zone_b:
+                raise InputParsingError(
+                    path, line_no,
+                    f'Connection "{name_pair}" links a zone to itself'
+                )
+            for name in endpoints:
+                if name not in zone_lines:
+                    raise InputParsingError(
+                        path, line_no,
+                        f'Connection uses undefined zone "{name}"'
+                    )
+                if zone_lines[name] > line_no:
+                    raise InputParsingError(
+                        path, line_no,
+                        f'Connection uses zone "{name}" before it is '
+                        f'defined (line {zone_lines[name]})'
+                    )
+            metadata_dict = {
+                'zone_a': zone_a, 'zone_b': zone_b, **metadata
+            }
+            try:
+                connection = Connection.model_validate(metadata_dict)
+            except ValidationError as error:
+                raise InputParsingError(
+                    path, line_no,
+                    _describe_validation_error(error, 'connection')
+                )
+            link = frozenset((zone_a, zone_b))
+            if link in connection_lines:
+                raise InputParsingError(
+                    path, line_no,
+                    f'Connection "{zone_a}-{zone_b}" is already defined '
+                    f'on line {connection_lines[link]}'
+                )
+            connection_lines[link] = line_no
             connections.append(connection)
-        try:
-            self.start = input_dict['start_hub']
-            self.end = input_dict['end_hub']
-            self.nb_drones = input_dict['nb_drones']
-            self.zones = zones
-            self.connections = connections
-        except Exception:
-            raise InputParsingError(
-                path, line_no,
-                "Invalid Config File, missing parts"
-            )
-        self.connection_lines = connection_lines
+        self.start = input_dict['start_hub']
+        self.end = input_dict['end_hub']
+        self.nb_drones = input_dict['nb_drones']
+        self.zones = zones
+        self.connections = connections
         self.zones_lines = zone_lines
 
     def _after_validation_check(self) -> None:
-        """Checks constrains after validating into a Config_Map"""
+        """Check constraints that need the complete configuration."""
         assert self.zones_lines is not None
         assert self.nb_drones is not None
         assert self.zones is not None
-        assert self.connections is not None
-        assert self.connection_lines is not None
-        zone_names: list[str] = []
-        start = self.start
         for zone in self.zones:
-            if zone.name == start:
-                if (
-                    zone.max_drones is not None
-                    and zone.max_drones < self.nb_drones
-                ):
-                    line_no = self.zones_lines[zone.name]
-                    raise InputParsingError(
-                        self.path, line_no,
-                        f'Error: {
-                            zone.name
-                        } has less capacity for {self.nb_drones} drones'
-                    )
-            zone_names.append(zone.name)
-        for con in self.connections:
-            assert con is not None
-            if con.zone_b not in zone_names or con.zone_a not in zone_names:
-                line_no = self.connection_lines[
-                    frozenset((con.zone_a, con.zone_b))
-                ]
+            if (
+                zone.name == self.start
+                and zone.max_drones is not None
+                and zone.max_drones < self.nb_drones
+            ):
                 raise InputParsingError(
-                    self.path, line_no,
-                    'Error: Connection contains not existing zone'
+                    self.path, self.zones_lines[zone.name],
+                    f'Start zone "{zone.name}" has max_drones='
+                    f'{zone.max_drones}, less than nb_drones='
+                    f'{self.nb_drones}'
                 )
 
 

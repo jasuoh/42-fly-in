@@ -114,7 +114,71 @@ Map files follow the format described in the project subject
 optional `[key=value]` metadata). Example maps of increasing difficulty are
 provided under [maps/](maps/), documented in [maps/README.md](maps/README.md).
 
-## Algorithm choices and implementation strategy
+## Example input and expected output
+
+Input ([maps/easy/02_simple_fork.txt](maps/easy/02_simple_fork.txt)):
+
+```text
+nb_drones: 3
+
+start_hub: start 0 0 [color=green]
+hub: junction 1 0 [color=yellow max_drones=2]
+hub: path_a 2 1 [color=blue]
+hub: path_b 2 -1 [color=blue]
+hub: path_c 2 0
+end_hub: goal 3 0 [color=red max_drones=3]
+
+connection: start-junction
+connection: junction-path_a
+connection: junction-path_b
+connection: path_a-goal
+connection: path_b-goal
+```
+
+Command:
+
+```sh
+uv run python -m src --map ./maps/easy/02_simple_fork.txt
+```
+
+After choosing *start* in the menu, every simulated turn is printed to the
+terminal (one line per turn, only the drones that move) while the Pygame
+window animates it:
+
+```text
+D0-junction
+D0-path_a D1-junction
+D0-goal D1-path_b D2-junction
+D1-goal D2-path_a
+D2-goal
+```
+
+The simulation ends after 5 turns, when all three drones are in `goal`.
+For a restricted zone a drone that is in flight is listed with the
+connection (`D<id>-<from>-<to>`) and lands on the next turn
+(see [maps/medium/02_circular_loop.txt](maps/medium/02_circular_loop.txt)):
+
+```text
+D0-start-loop_a
+D0-loop_a
+D0-loop_a-loop_b D1-start-loop_a
+```
+
+An invalid map stops the program with exit status 1 and a message on
+`stderr` that names the file, the line and the cause:
+
+```text
+$ uv run python -m src --map bad.txt
+bad.txt:3: Invalid zone definition: "zone": Input should be 'normal', 'blocked', 'restricted' or 'priority' (got 'lava')
+```
+
+A map without any route from start to end is reported as well:
+
+```text
+Invalid config file: No valid path from start to endhub
+```
+
+## Algorithm explanation
 
 The routing/simulation pipeline is split into independent stages, each in
 its own module:
@@ -123,7 +187,17 @@ its own module:
    file line by line into a raw key/value structure, then validates it into
    typed `pydantic` models (`Zone`, `Connection`). Any structural or
    semantic error (unknown key, invalid zone type, malformed metadata, ...)
-   raises `InputParsingError` and aborts with a clear message.
+   raises `InputParsingError` and aborts with exit status 1 and a message of
+   the form `file:line: cause`, e.g.
+   `map.txt:3: Invalid zone definition: "max_drones": Input should be greater than 0 (got '0')`.
+   Besides the syntax, the parser enforces the rules of the subject:
+   `nb_drones` must be the first line and a positive integer (there is no
+   upper limit), exactly one `start_hub` and one `end_hub`, unique zone names
+   without dashes, integer coordinates, capacities that are positive
+   integers, valid zone types, and connections that link two *previously
+   defined*, different zones and are not duplicated (`a-b` equals `b-a`).
+   Metadata must be a single, closed `[key=value ...]` block at the end of
+   the line, and every key may appear only once.
 
 2. **Graph** ([src/pathfinding_algorithm.py](src/pathfinding_algorithm.py))
    builds an adjacency-list graph (`Map`) from the parsed zones and

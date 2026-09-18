@@ -6,9 +6,15 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "flake8>=7.3.0",
+    "flake8-pyproject>=1.2.4",
     "mypy>=2.3.0",
     "pydantic>=2.13.4",
-    "pygame>=2.6.1",
     "pygame-ce>=2.5.8",
     "rich>=15.0.0",
 ]
+
+[tool.flake8]
+exclude = [".venv", ".git", "__pycache__", ".mypy_cache", "fly-in-tests"]
+
+[tool.mypy]
+exclude = ["fly-in-tests/"]
