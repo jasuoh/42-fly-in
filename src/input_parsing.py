@@ -98,38 +98,65 @@ class Config_Map():
             path: Path to the map configuration file.
         """
         self.path = path
+        line_nummer: int = 1
         allowed_keys = [
             "nb_drones", "start_hub", "end_hub", "hub", "connection"
         ]
         value_dict: dict[str, Any] = {}
         value_dict["hub"] = []
         value_dict["connection"] = []
-        try:
-            with open(path) as f:
-                data = f.read()
-            for line_no, line in enumerate(data.splitlines(), start=1):
-                if not line or line.startswith("#"):
-                    continue
+        with open(path) as f:
+            data = f.read()
+        for line_no, line in enumerate(data.splitlines(), start=1):
+            if not line or line.startswith("#"):
+                continue
+            try:
+                key, value = line.split(":", 1)
+            except ValueError:
+                raise InputParsingError(
+                    path, line_no, "Error: Malformed Line"
+                )
+            if key.strip() not in allowed_keys:
+                raise InputParsingError(
+                    path, line_no,
+                    f"Invalid Argument for Map-file: {key.strip()}"
+                )
+            if key.strip() in ['start_hub', 'end_hub']:
+                value_dict['hub'].append((line_no, value.strip()))
+                value_dict[key.strip()] = value.strip().split(' ')[0]
+            elif key.strip() not in ["hub", "connection"]:
                 try:
-                    key, value = line.split(":", 1)
+                    nb_drones_value = int(value.strip())
                 except ValueError:
                     raise InputParsingError(
-                        path, line_no, "Error: Malformed Line"
+                        path, line_no, 'Number of Drones should be int'
                     )
-                if key.strip() not in allowed_keys:
+                if nb_drones_value < 1 or nb_drones_value > 9999:
+                    raise InputParsingError(
+                        path, line_no, 'Invalid value for number of drones'
+                    )
+                if value_dict.get(key.strip()) is not None:
                     raise InputParsingError(
                         path, line_no,
-                        f"Invalid Argument for Map-file: {key.strip()}"
+                        'Error: nb_drones should be defined once'
                     )
-                if key.strip() in ['start_hub', 'end_hub']:
-                    value_dict['hub'].append((line_no, value.strip()))
-                    value_dict[key.strip()] = value.strip().split(' ')[0]
-                elif key.strip() not in ["hub", "connection"]:
-                    value_dict[key.strip()] = int(value.strip())
                 else:
-                    value_dict[key.strip()].append((line_no, value.strip()))
-        except Exception as e:
-            print(e)
+                    value_dict[key.strip()] = nb_drones_value
+            else:
+                value_dict[key.strip()].append((line_no, value.strip()))
+            line_nummer = line_no
+        if value_dict.get('nb_drones') is None:
+            raise InputParsingError(
+                path, line_nummer, 'Missing parameter: nb_drones'
+            )
+        if value_dict.get('start_hub') is None:
+            raise InputParsingError(
+                path, line_nummer, 'Missing parameter: start_hub'
+            )
+        if value_dict.get('end_hub') is None:
+            raise InputParsingError(
+                path, line_nummer, 'Missing parameter: end_hub'
+            )
         self._value_dict = value_dict
 
     def _assign_dict_to_obj(self) -> None:
@@ -165,8 +192,8 @@ class Config_Map():
                 if key.strip().replace('[', '') not in allowed_keys_zones:
                     raise InputParsingError(
                         self.path, line_no,
-                        f'Inputparsing Error: {key.strip().replace("[", "")}'
-                        'is invalid!'
+                        f'Inputparsing Error: "{key.strip().replace("[", "")}"'
+                        ' is invalid!'
                     )
                 metadata_dict[
                     key.strip().replace("[", '')
@@ -229,15 +256,8 @@ class Config_Map():
         except Exception:
             raise InputParsingError(
                 path, line_no,
-                "Error with parsing into Config Model"
+                "Invalid Config File, missing parts"
             )
-
-    def validation_after_creation(self) -> None:
-        """Validate the fully parsed configuration.
-
-        Not yet implemented.
-        """
-        ...  # TODO: validation for map file after checking each line
 
 
 def input_parsing(path: str) -> Config_Map:
@@ -257,6 +277,6 @@ def input_parsing(path: str) -> Config_Map:
         config._input_parsing_and_error_handling(path=path)
         config._assign_dict_to_obj()
     except BaseException as e:
-        print(e)
+        print(e, file=sys.stderr)
         sys.exit(1)
     return config
