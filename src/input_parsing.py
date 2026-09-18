@@ -90,8 +90,8 @@ class Config_Map():
         self.connections: list[Connection] | None = None
         self._value_dict: dict[str, Any] | None = None
         self.path: str | None = None
-        self.connection_lines: dict | None = None
-        self.zones_lines: dict | None = None
+        self.connection_lines: dict[frozenset[str], int] | None = None
+        self.zones_lines: dict[str, int] | None = None
 
     def _input_parsing_and_error_handling(self, path: str) -> None:
         """Read the map file at ``path`` into a raw key/value dictionary.
@@ -214,7 +214,7 @@ class Config_Map():
                     path, line_no,
                     "Error with validating data for Zone"
                 )
-            if zone.name in zone_lines:
+            if zone.name in zone_lines.keys():
                 raise InputParsingError(
                     path, line_no,
                     f'Error: zone "{zone.name}" already defined on line '
@@ -264,13 +264,23 @@ class Config_Map():
                     self.path, line_no,
                     "Error: Invalid Connection"
                 )
-            if frozenset((connection.zone_a, connection.zone_b)) in connection_lines:
+            if frozenset(
+                (connection.zone_a, connection.zone_b)
+            ) in connection_lines.keys():
                 raise InputParsingError(
                     path, line_no,
-                    f'Error: Connection "{connection.zone_a, connection.zone_b}"'
-                    f"already defindet on {connection_lines[frozenset((connection.zone_a, connection.zone_b))]}"
+                    f'Error: Connection "{
+                        connection.zone_a, connection.zone_b
+                        }"'
+                    f" already definded in line {
+                        connection_lines[
+                            frozenset((connection.zone_a, connection.zone_b))
+                        ]
+                    }"
                 )
-            connection_lines[frozenset((connection.zone_a, connection.zone_b))] = line_no
+            connection_lines[
+                frozenset((connection.zone_a, connection.zone_b))
+            ] = line_no
             connections.append(connection)
         try:
             self.start = input_dict['start_hub']
@@ -286,17 +296,39 @@ class Config_Map():
         self.connection_lines = connection_lines
         self.zones_lines = zone_lines
 
-
-    def _after_validation_check(self):
+    def _after_validation_check(self) -> None:
+        """Checks constrains after validating into a Config_Map"""
+        assert self.zones_lines is not None
+        assert self.nb_drones is not None
+        assert self.zones is not None
+        assert self.connections is not None
+        assert self.connection_lines is not None
+        zone_names: list[str] = []
         start = self.start
         for zone in self.zones:
             if zone.name == start:
-                if zone.max_drones < self.nb_drones:
+                if (
+                    zone.max_drones is not None
+                    and zone.max_drones < self.nb_drones
+                ):
                     line_no = self.zones_lines[zone.name]
                     raise InputParsingError(
                         self.path, line_no,
-                        f'Error: {zone.name} has less capacity for {self.nb_drones} drones'
+                        f'Error: {
+                            zone.name
+                        } has less capacity for {self.nb_drones} drones'
                     )
+            zone_names.append(zone.name)
+        for con in self.connections:
+            assert con is not None
+            if con.zone_b not in zone_names or con.zone_a not in zone_names:
+                line_no = self.connection_lines[
+                    frozenset((con.zone_a, con.zone_b))
+                ]
+                raise InputParsingError(
+                    self.path, line_no,
+                    'Error: Connection contains not existing zone'
+                )
 
 
 def input_parsing(path: str) -> Config_Map:
