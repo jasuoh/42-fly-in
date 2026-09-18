@@ -4,10 +4,8 @@
 import sys
 from .input_parsing import input_parsing
 from .argparsing import ArgParsing
-from .pathfinding_algorithm import Map, Graph, CustomException
-from .drone_factory import DroneFactory
-from .route_planner import RoutePlanner
-from .simulation_engine import Scheduler
+from .pathfinding_algorithm import CustomException
+from .simulation_engine import build_scheduler
 from .visual_representation import Visualizer
 
 
@@ -19,25 +17,11 @@ def main() -> None:
         return
 
     config = input_parsing(map_path)
-    assert config.start is not None
-    assert config.end is not None
-    assert config.nb_drones is not None
     try:
-        map = Map.from_config(config)
-        G = Graph(map)
-        planner = RoutePlanner(
-            map=map, graph=G, start=config.start, end=config.end
-        )
-        paths = planner.assign_paths(int(config.nb_drones))
+        S = build_scheduler(config)
     except CustomException as e:
         print(e, file=sys.stderr)
         sys.exit(1)
-    F = DroneFactory((config.nb_drones))
-    F.get_drone_list(
-        start_hub=config.start,
-        paths=paths,
-    )
-    S = Scheduler(map=map, graph=G, drone_list=F.drone_list, config=config)
     Visualizer(
         config.zones, config.connections, S
     ).run()

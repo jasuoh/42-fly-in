@@ -105,6 +105,7 @@ Controls in the simulation view:
 
 - `Space` — pause / unpause the simulation.
 - `Right arrow` — while paused, advance a single turn.
+- `R` or the **Retry** button — restart the simulation from turn 0.
 - `Esc` — quit.
 - `E` — once the simulation has finished, return to the menu.
 
@@ -127,7 +128,11 @@ its own module:
 2. **Graph** ([src/pathfinding_algorithm.py](src/pathfinding_algorithm.py))
    builds an adjacency-list graph (`Map`) from the parsed zones and
    connections, skipping `blocked` zones entirely so they can never be
-   entered. `Graph.shortest_distance` implements **Dijkstra's algorithm**
+   entered. Connections that touch a blocked zone are dropped from the graph
+   (a blocked zone is valid, just inaccessible), while connections to a zone
+   that is not defined at all are an error. If no route from start to end
+   remains, a clear "no valid path" error is raised.
+   `Graph.shortest_distance` implements **Dijkstra's algorithm**
    from scratch (using `heapq`) with a pluggable edge-weight function,
    defaulting to the destination zone's movement cost.
 
@@ -147,7 +152,7 @@ its own module:
    ```mermaid
    flowchart TD
        A["1. Land completed transits\n(restricted-zone arrivals)"] --> B["2. Sort movable drones\n(longest-blocked first, then\nshortest remaining path)"]
-       B --> C{"3. For each drone:\ncan it enter its next zone\n(zone + link capacity free)?"}
+       B --> C{"3. Repeat until nothing changes:\ncan a drone enter its next zone\n(zone + link capacity free)?"}
        C -- "yes" --> D["Move / start transit\nrecord D&lt;id&gt;-&lt;target&gt;"]
        C -- "no" --> E["mark_blocked()\nretry next turn"]
        D --> F{"4. Any move happened\nthis turn?"}
@@ -157,7 +162,11 @@ its own module:
        F -- "all drones delivered" --> H["done"]
    ```
 
-   A turn cap (`longest path + zones × drones`) bounds the simulation; if a
+   Drones that cannot move immediately are retried within the same turn
+   until no more drone can advance. This lets a drone move into a zone that
+   another drone leaves in that very turn (as the subject requires),
+   regardless of the order the drones are processed in. A turn cap
+   (`longest path + zones × drones`) bounds the simulation; if a
    turn produces no movement at all, or the cap is exceeded,
    `SchedulerDeadlockError` is raised with the state of every stuck drone.
 
@@ -183,6 +192,27 @@ runs it once per drone, so path assignment is `O(D · (V + E) log V)` for
 up front and then simply consumed turn by turn — no re-planning happens
 during the simulation, keeping memory usage at `O(V + E + D)` for the
 graph and drone paths.
+
+## Performance
+
+Turns needed by this implementation compared with the reference targets of
+the subject (fewer is better; every map is solved in well under a second):
+
+| Map | Drones | Turns | Target |
+| --- | --- | --- | --- |
+| easy / linear path | 2 | 4 | ≤ 6 |
+| easy / simple fork | 3 | 5 | ≤ 6 |
+| easy / basic capacity | 4 | 6 | ≤ 8 |
+| medium / dead end trap | 5 | 8 | ≤ 15 |
+| medium / circular loop | 6 | 20 | ≤ 20 |
+| medium / priority puzzle | 4 | 8 | ≤ 12 |
+| hard / maze nightmare | 8 | 18 | ≤ 45 |
+| hard / capacity hell | 12 | 23 | ≤ 60 |
+| hard / ultimate challenge | 15 | 31 | ≤ 35 |
+| challenger / impossible dream (optional) | 25 | 66 | record: 45 |
+
+All mandatory targets are met. The optional challenger map is solved
+correctly but does not beat the reference record.
 
 ## Visual representation
 
@@ -218,7 +248,8 @@ The simulation view (`DroneScreen`) is the core visualization:
   `D<id>-<zone>` output be cross-checked against what is drawn.
 - The turn counter, pause state and step-by-step controls (`Space`,
   `Right arrow`) let a reviewer freeze the simulation and inspect any
-  single turn in detail.
+  single turn in detail. A **Retry** button (or `R`) restarts the run from
+  turn 0 with a freshly planned simulation.
 
 This turns the abstract turn log into an at-a-glance view of congestion,
 capacity usage and drone progress, which was the main goal of the visual

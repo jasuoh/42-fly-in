@@ -51,27 +51,35 @@ class Map():
                 connections already populated.
 
         Returns:
-            The resulting map, excluding blocked zones.
+            The resulting map, excluding blocked zones. Connections
+            that touch a blocked zone are silently dropped, since the
+            zone is a valid (if inaccessible) part of the topology.
 
         Raises:
-            CustomException: If a connection references an unknown or
-                blocked zone, or if the start/end zone is missing or
-                blocked.
+            CustomException: If a connection references a zone name
+                that is not defined at all, or if the start/end zone
+                is missing or blocked.
         """
         assert config.zones is not None
         assert config.connections is not None
+        all_zone_names = {zone.name for zone in config.zones}
         zoneNode_dict: dict[str, 'Map.ZoneNode'] = {}
         for zone in config.zones:
             if zone.zone == zone_types.blocked:
                 continue
             zoneNode_dict[zone.name] = Map.ZoneNode(zone=zone)
         for connection in config.connections:
-            node_a = zoneNode_dict.get(connection.zone_a)
-            node_b = zoneNode_dict.get(connection.zone_b)
-            if not node_a or not node_b:
+            if (
+                connection.zone_a not in all_zone_names
+                or connection.zone_b not in all_zone_names
+            ):
                 raise CustomException(
                     'Invalid Connection Node/Zone'
                 )
+            node_a = zoneNode_dict.get(connection.zone_a)
+            node_b = zoneNode_dict.get(connection.zone_b)
+            if not node_a or not node_b:
+                continue
             node_a.neighbor_zones.append((node_b, connection))
             node_b.neighbor_zones.append((node_a, connection))
         if (config.start not in zoneNode_dict

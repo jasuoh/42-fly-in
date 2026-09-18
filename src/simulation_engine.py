@@ -2,8 +2,9 @@
 """Turn-by-turn simulation engine enforcing capacity and movement rules."""
 
 from .pathfinding_algorithm import Map, Graph
-from .drone_factory import Drone, status_type
+from .drone_factory import Drone, DroneFactory, status_type
 from .input_parsing import Config_Map, Connection, Zone, zone_types
+from .route_planner import RoutePlanner
 
 LinkKey = frozenset[str]
 
@@ -39,6 +40,32 @@ class SchedulerDeadlockError(Exception):
         return "\n".join(lines)
 
 
+def build_scheduler(config: Config_Map) -> 'Scheduler':
+    """Plan routes for ``config`` and return a fresh, unstarted scheduler.
+
+    Args:
+        config: The fully parsed map configuration.
+
+    Returns:
+        A new :class:`Scheduler` at turn 0.
+
+    Raises:
+        CustomException: If the map has no valid path from start to end.
+    """
+    assert config.start is not None
+    assert config.end is not None
+    assert config.nb_drones is not None
+    map = Map.from_config(config)
+    graph = Graph(map)
+    planner = RoutePlanner(
+        map=map, graph=graph, start=config.start, end=config.end
+    )
+    paths = planner.assign_paths(int(config.nb_drones))
+    factory = DroneFactory(int(config.nb_drones))
+    factory.get_drone_list(start_hub=config.start, paths=paths)
+    return Scheduler(map, graph, factory.drone_list, config)
+
+
 class Scheduler():
     """Advances all drones turn by turn, enforcing zone and link capacity."""
 
@@ -61,6 +88,7 @@ class Scheduler():
         assert config.connections is not None
         assert config.start is not None
         assert config.end is not None
+        self.config = config
         self.map = map
         self.graph = graph
         self.drone_list: list[Drone] = drone_list
@@ -168,41 +196,62 @@ class Scheduler():
                 len(d.current_path),
             ),
         )
-        for drone in movable:
-            assert drone.current_zone is not None
-            source = drone.current_zone
-            next_zone_name = drone.current_path[0]
-            connection = self._connection(source, next_zone_name)
-            link = frozenset({source, next_zone_name})
-            link_capacity = connection.max_link_capacity or 1
-            if link_usage.get(link, 0) >= link_capacity:
-                drone.mark_blocked()
-                continue
-            next_zone = self.zone_dict[next_zone_name]
-            if next_zone.zone == zone_types.restricted:
-                if not self._can_enter(next_zone_name):
-                    drone.mark_blocked()
-                    continue
-                self.zone_occupancy[source] -= 1
-                self.zone_reserved[next_zone_name] += 1
-                self.in_flight[drone.drone_id] = (
-                    link, next_zone_name, self.current_turn + 1
-                )
-                drone.last_zones.append(drone.start_transit())
-                link_usage[link] = link_usage.get(link, 0) + 1
-                moves.append(f"D{drone.drone_id}-{source}-{next_zone_name}")
-            else:
-                if not self._can_enter(next_zone_name):
-                    drone.mark_blocked()
-                    continue
-                self.zone_occupancy[source] -= 1
-                self.zone_occupancy[next_zone_name] = (
-                    self.zone_occupancy.get(next_zone_name, 0) + 1
-                )
-                drone.move(next_zone_name)
-                link_usage[link] = link_usage.get(link, 0) + 1
-                moves.append(f"D{drone.drone_id}-{next_zone_name}")
+        pending = movable
+        progress = True
+        while progress and pending:
+            progress = False
+            blocked: list[Drone] = []
+            for drone in pending:
+                if self._try_move(drone, link_usage, moves):
+                    progress = True
+                else:
+                    blocked.append(drone)
+            pending = blocked
+        for drone in pending:
+            drone.mark_blocked()
         return " ".join(moves)
+
+    def _try_move(
+        self, drone: Drone, link_usage: dict[LinkKey, int], moves: list[str]
+    ) -> bool:
+        """Move ``drone`` one step along its path if the rules allow it.
+
+        Args:
+            drone: The drone to advance.
+            link_usage: Per-link usage of the current turn, updated on
+                success.
+            moves: The current turn's move log, appended to on success.
+
+        Returns:
+            True if the drone moved (or entered a transit), False if
+            it is blocked by link or zone capacity.
+        """
+        assert drone.current_zone is not None
+        source = drone.current_zone
+        next_zone_name = drone.current_path[0]
+        connection = self._connection(source, next_zone_name)
+        link = frozenset({source, next_zone_name})
+        link_capacity = connection.max_link_capacity or 1
+        if link_usage.get(link, 0) >= link_capacity:
+            return False
+        if not self._can_enter(next_zone_name):
+            return False
+        self.zone_occupancy[source] -= 1
+        if self.zone_dict[next_zone_name].zone == zone_types.restricted:
+            self.zone_reserved[next_zone_name] += 1
+            self.in_flight[drone.drone_id] = (
+                link, next_zone_name, self.current_turn + 1
+            )
+            drone.last_zones.append(drone.start_transit())
+            moves.append(f"D{drone.drone_id}-{source}-{next_zone_name}")
+        else:
+            self.zone_occupancy[next_zone_name] = (
+                self.zone_occupancy.get(next_zone_name, 0) + 1
+            )
+            drone.move(next_zone_name)
+            moves.append(f"D{drone.drone_id}-{next_zone_name}")
+        link_usage[link] = link_usage.get(link, 0) + 1
+        return True
 
     def _stuck_drones(self) -> list[tuple[int, str | None, str | None]]:
         """Return (id, current zone, awaited zone) for undelivered drones."""

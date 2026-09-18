@@ -6,11 +6,9 @@ import sys
 import pygame as pg
 from .drone_factory import Drone, status_type
 from .input_parsing import Connection, Zone
-from .simulation_engine import Scheduler
+from .simulation_engine import Scheduler, build_scheduler
 from .input_parsing import input_parsing, Config_Map
-from .pathfinding_algorithm import Map, Graph, CustomException
-from .drone_factory import DroneFactory
-from .route_planner import RoutePlanner
+from .pathfinding_algorithm import CustomException
 from .visual import (
     BaseScene, ParticleSystem,
     Background, Snowflake, Scene, Drone_System
@@ -215,6 +213,10 @@ class DroneScreen(BaseScene):
         self.width = screen_width
         self.height = screen_height
         self.dronesystem = dronesystem
+        self._retry_label = 'Retry'
+        self._retry_hover = False
+        label_w, label_h = self.font.size(self._retry_label)
+        self._retry_rect = pg.Rect(10, 35, label_w + 20, label_h + 10)
         self._screen_positions: dict[str, tuple[float, float]] | None = None
         self._zone_capacities: dict[str, int] = {
             zone.name: cap
@@ -280,7 +282,8 @@ class DroneScreen(BaseScene):
     def _draw_legend(self, surface: pg.Surface) -> None:
         """Draw the keyboard shortcut hint in the top-right corner."""
         label = self.font.render(
-            'Space: Pause/unpause Right arrow: next turn', True, 'White'
+            'Space: Pause/unpause Right arrow: next turn R: retry',
+            True, 'White'
         )
         label_rect = label.get_rect(topright=(self.width - 25, 0))
         surface.blit(label, label_rect)
@@ -382,8 +385,24 @@ class DroneScreen(BaseScene):
                 self.pause = not self.pause
             elif event.key == pg.K_e and self._finished:
                 self.end = True
+            elif event.key == pg.K_r:
+                self._retry()
+        elif event.type == pg.MOUSEMOTION:
+            self._retry_hover = self._retry_rect.collidepoint(event.pos)
         elif event.type == pg.MOUSEBUTTONDOWN:
-            ...
+            if self._retry_rect.collidepoint(event.pos):
+                self._retry()
+
+    def _retry(self) -> None:
+        """Restart the simulation from turn 0 with a fresh scheduler."""
+        self.scheduler = build_scheduler(self.scheduler.config)
+        self._elapsed = 0.0
+        self._finished = False
+        self.pause = False
+        self.end = False
+        self.current_turn = None
+        self._prev_positions = self._capture_positions()
+        self._target_positions = self._prev_positions
 
     def update_content(self, dt: float) -> None:
         """Advance drone animation and, once per interval, the simulation."""
@@ -455,6 +474,7 @@ class DroneScreen(BaseScene):
         )
         turn_rect = turn_count.get_rect(topleft=(0, 0))
         surface.blit(turn_count, turn_rect)
+        self._draw_retry_button(surface)
         x = 0
         label_surface = pg.Surface(
             (2 * self.padding_x - 25,
@@ -473,6 +493,13 @@ class DroneScreen(BaseScene):
                 )
             )
         self._draw_capacities(surface)
+
+    def _draw_retry_button(self, surface: pg.Surface) -> None:
+        """Draw the retry button, highlighted while hovered."""
+        color = 'Purple' if self._retry_hover else 'White'
+        pg.draw.rect(surface, color, self._retry_rect, 2, 4)
+        label = self.font.render(self._retry_label, True, color)
+        surface.blit(label, label.get_rect(center=self._retry_rect.center))
 
     def _draw_capacities(self, surface: pg.Surface) -> None:
         """Draw zone occupancy and link usage labels over the network."""
@@ -602,29 +629,12 @@ class MapSelection(BaseScene):
         if self._chosen is None:
             return None
         config = input_parsing(self._chosen.path)
-        assert config.start is not None
-        assert config.end is not None
-        assert config.nb_drones is not None
         try:
-            map = Map.from_config(config)
-            graph = Graph(map)
-            planner = RoutePlanner(
-                map=map, graph=graph, start=config.start, end=config.end
-            )
-            paths = planner.assign_paths(int(config.nb_drones))
+            scheduler = build_scheduler(config)
         except CustomException as e:
             print(e, file=sys.stderr)
             sys.exit(1)
-        F = DroneFactory(int(config.nb_drones))
-        F.get_drone_list(
-            start_hub=config.start,
-            paths=paths,
-        )
-        return (
-            self._chosen.target, Scheduler(
-                map, graph, F.drone_list, config
-            ), config
-        )
+        return (self._chosen.target, scheduler, config)
 
 
 class Visualizer():
@@ -720,7 +730,8 @@ class Visualizer():
                 else (config.connections if config is not None else None)
             )
             active_scheduler = (
-                self.scheduler if self.scheduler is not None else scheduler
+                build_scheduler(self.scheduler.config)
+                if self.scheduler is not None else scheduler
             )
             assert zones is not None
             assert connections is not None
