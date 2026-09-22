@@ -25,7 +25,7 @@ class Drone():
         """
         self.drone_id: int = drone_id
         self.current_zone: str | None = zone
-        self.last_zones: list[str] = ['start_hub']
+        self.last_zones: list[str] = [zone]
         self.current_path: list[str] = path
         self.blocked_turns: int = 0
         self.current_status: status_type = (

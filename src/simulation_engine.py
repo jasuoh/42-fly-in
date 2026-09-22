@@ -179,7 +179,6 @@ class Scheduler():
             self.zone_occupancy[destination] += 1
             drone = self.drone_by_id[drone_id]
             drone.complete_transit(destination)
-            link_usage[link] = link_usage.get(link, 0) + 1
             moves.append(f"D{drone.drone_id}-{destination}")
         for link, _, arrival_turn in self.in_flight.values():
             if arrival_turn > self.current_turn:
