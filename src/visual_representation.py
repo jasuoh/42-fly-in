@@ -210,6 +210,8 @@ class DroneScreen(BaseScene):
         self.pause = False
         self.end = False
         self.current_turn: str | None = None
+        self._target_turn = 0
+        self._turn_logs: list[str] = []
         self.width = screen_width
         self.height = screen_height
         self.dronesystem = dronesystem
@@ -282,7 +284,8 @@ class DroneScreen(BaseScene):
     def _draw_legend(self, surface: pg.Surface) -> None:
         """Draw the keyboard shortcut hint in the top-right corner."""
         label = self.font.render(
-            'Space: Pause/unpause Right arrow: next turn R: retry',
+            'Space: Pause/unpause Right arrow: next turn '
+            'Left arrow: previous turn R: retry',
             True, 'White'
         )
         label_rect = label.get_rect(topright=(self.width - 25, 0))
@@ -390,7 +393,13 @@ class DroneScreen(BaseScene):
     def handle_event(self, event: pg.event.Event) -> None:
         """Handle turn stepping, pause toggling and returning to the menu."""
         if event.type == pg.KEYDOWN and event.key == pg.K_RIGHT:
-            self._elapsed = self.turn_interval
+            if self.pause:
+                self._step_forward()
+                self._elapsed = self.turn_interval
+        elif event.type == pg.KEYDOWN and event.key == pg.K_LEFT:
+            if self.pause:
+                self._step_backward()
+                self._elapsed = self.turn_interval
         elif event.type == pg.KEYDOWN:
             if event.key == pg.K_SPACE:
                 self.pause = not self.pause
@@ -406,14 +415,59 @@ class DroneScreen(BaseScene):
 
     def _retry(self) -> None:
         """Restart the simulation from turn 0 with a fresh scheduler."""
-        self.scheduler = build_scheduler(self.scheduler.config)
+        self._goto_turn(0)
         self._elapsed = 0.0
-        self._finished = False
         self.pause = False
         self.end = False
-        self.current_turn = None
+
+    def _step_forward(self) -> None:
+        """Advance the live simulation by exactly one turn.
+
+        Reuses the current scheduler in place (cheap): every forward
+        step, whether driven by the autoplay timer or by a manual
+        ``Right arrow`` press, always starts from the turn the
+        scheduler already sits at.
+        """
+        if self._finished:
+            return
         self._prev_positions = self._capture_positions()
-        self._target_positions = self._prev_positions
+        self.current_turn = self.scheduler.gen_turn()
+        self._turn_logs.append(self.current_turn)
+        self._target_turn += 1
+        self._target_positions = self._capture_positions()
+        print(self.current_turn)
+        self._finished = all(
+            drone.current_status == status_type.delivered
+            for drone in self.scheduler.drone_list
+        )
+
+    def _step_backward(self) -> None:
+        """Step back to the previous turn, if any."""
+        if self._target_turn <= 0:
+            return
+        self._goto_turn(self._target_turn - 1)
+
+    def _goto_turn(self, turn: int) -> None:
+        """Rebuild the scheduler and replay it up to ``turn``.
+
+        The simulation is fully deterministic (no randomness in
+        routing or scheduling), so re-planning from scratch and
+        replaying ``turn`` turns always reproduces the exact state
+        the live scheduler had at that point. Replaying is cheap
+        enough for every map this project ships with (at most a few
+        dozen turns), so this trades a little recomputation for not
+        having to snapshot the full scheduler state after every turn.
+        """
+        self._prev_positions = self._capture_positions()
+        self.scheduler = build_scheduler(self.scheduler.config)
+        self._turn_logs = [self.scheduler.gen_turn() for _ in range(turn)]
+        self._target_turn = turn
+        self.current_turn = self._turn_logs[-1] if self._turn_logs else None
+        self._target_positions = self._capture_positions()
+        self._finished = all(
+            drone.current_status == status_type.delivered
+            for drone in self.scheduler.drone_list
+        )
 
     def update_content(self, dt: float) -> None:
         """Advance drone animation and, once per interval, the simulation."""
@@ -426,15 +480,7 @@ class DroneScreen(BaseScene):
         if self._elapsed < self.turn_interval:
             return
         self._elapsed = 0.0
-        self._prev_positions = self._capture_positions()
-        self.current_turn = self.scheduler.gen_turn()
-        self._target_positions = self._capture_positions()
-        if not self._finished:
-            print(self.current_turn)
-        self._finished = all(
-            drone.current_status == status_type.delivered
-            for drone in self.scheduler.drone_list
-        )
+        self._step_forward()
 
     def _final_zone_pos(self, drone: Drone) -> tuple[float, float] | None:
         """Return the screen position of the zone ``drone`` currently
@@ -809,7 +855,7 @@ class Visualizer():
                     ), 'drone'
                 ),
                 MapItem(
-                    'Map 09: Dead End Trap',
+                    'Map 09: Ultimate Challenge',
                     './maps/hard/03_ultimate_challenge.txt', (
                         self.width // 8, 450
                     ), 'drone'
@@ -821,9 +867,30 @@ class Visualizer():
             )
         raise ValueError(f'Unknown scene: {name}')
 
+    def _initial_window_size(self) -> tuple[int, int]:
+        """Pick a startup window size that fits the user's screen.
+
+        Keeps the 16:9 aspect ratio every layout constant in this
+        module assumes (backgrounds, padding, font scaling), just
+        sized to fit the desktop instead of hardcoded to 1920x1080,
+        which can be larger than the actual screen.
+        """
+        try:
+            desktop_width, desktop_height = pg.display.get_desktop_sizes()[0]
+        except (pg.error, IndexError):
+            return self.width, self.height
+        margin = 0.85
+        width = int(desktop_width * margin)
+        height = width * 9 // 16
+        if height > desktop_height * margin:
+            height = int(desktop_height * margin)
+            width = height * 16 // 9
+        return width, height
+
     def run(self) -> None:
         """Open the window and run the main loop until the user quits."""
         pg.init()
+        self.width, self.height = self._initial_window_size()
         screen = pg.display.set_mode(
             (self.width, self.height), pg.RESIZABLE | pg.SCALED
         )
