@@ -1,9 +1,36 @@
+<!--
+:<<'MDEOF'
+-->
 *This project has been created as part of the 42 curriculum by jawosylu.*
 
 # Fly-In
 
-Autonomous multi-drone routing and turn-by-turn simulation, with a live
-Pygame visualization.
+**Autonomous multi-drone routing and turn-by-turn simulation, with a live
+Pygame visualization.**
+
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![mypy](https://img.shields.io/badge/type--checked-mypy%20--strict-2a6db2)](https://mypy-lang.org/)
+[![flake8](https://img.shields.io/badge/lint-flake8-yellow)](https://flake8.pycqa.org/)
+[![uv](https://img.shields.io/badge/deps-uv-de5fe9)](https://docs.astral.sh/uv/)
+[![No graph libraries](https://img.shields.io/badge/graph%20logic-from%20scratch-important)](#algorithm-explanation)
+
+## Highlights
+
+- **Zero graph libraries** — `Map`, `Graph.shortest_distance` (Dijkstra) and
+  the whole scheduler are hand-written, as required by the subject's
+  [Constraints](#subject-requirements-at-a-glance).
+- **Congestion-aware routing** — each drone is routed with a Dijkstra weight
+  function that penalizes zones/connections already reserved by earlier
+  drones, spreading the fleet across parallel paths instead of funneling
+  everyone through the same bottleneck.
+- **Full turn-by-turn Pygame simulation** — pause, single-step forward *and
+  backward* through the exact turn history, or restart from scratch.
+- **`mypy --strict` + `flake8` clean**, fully object-oriented, documented
+  with PEP 257 docstrings throughout.
+- **28 hand-built test maps** (`maps/`), from linear warm-ups to a
+  deliberately near-unsolvable 25-drone challenger map, plus a dedicated
+  `maps/critical/` suite that isolates the rule interactions that are
+  easiest to get subtly wrong.
 
 ## Description
 
@@ -42,7 +69,9 @@ The simulation screenshot above shows `maps/medium/03_priority_puzzle.txt`
 mid-run: drones (the small X-shaped sprites) in transit between zones, live
 `occupancy/capacity` labels under `fast_junction` and `merge_point`, the
 red `restricted` zones on the slow upper path, and the running turn log in
-the bottom-right panel.
+the bottom-right panel. The `Left arrow`/`Right arrow` hint in the top-right
+legend shows the step-by-step turn navigation described in
+[Visual representation](#visual-representation).
 
 ## Project structure
 
@@ -101,13 +130,19 @@ directly on the command line:
 uv run python -m src --map ./maps/easy/01_linear_path.txt
 ```
 
+The window opens sized to fit your screen (85% of the desktop resolution,
+keeping a 16:9 layout) and can be freely resized or maximized afterwards.
+
 Controls in the simulation view:
 
-- `Space` — pause / unpause the simulation.
-- `Right arrow` — while paused, advance a single turn.
-- `R` or the **Retry** button — restart the simulation from turn 0.
-- `Esc` — quit.
-- `E` — once the simulation has finished, return to the menu.
+| Key | Effect |
+| --- | --- |
+| `Space` | Pause / unpause the simulation |
+| `Right arrow` | While paused, advance a single turn |
+| `Left arrow` | While paused, step back to the previous turn |
+| `R` / **Retry** button | Restart the simulation from turn 0 |
+| `E` | Once finished, return to the menu |
+| `Esc` | Quit |
 
 Map files follow the format described in the project subject
 (`nb_drones`, `start_hub`, `end_hub`, `hub`, `connection` lines with
@@ -239,9 +274,12 @@ its own module:
    Drones that cannot move immediately are retried within the same turn
    until no more drone can advance. This lets a drone move into a zone that
    another drone leaves in that very turn (as the subject requires),
-   regardless of the order the drones are processed in. A turn cap
-   (`longest path + zones × drones`) bounds the simulation; if a
-   turn produces no movement at all, or the cap is exceeded,
+   regardless of the order the drones are processed in. The same hand-off
+   principle is applied to connections too: a connection a drone finishes
+   transiting on this turn is free again for another drone to start a new
+   transit on, in that same turn, instead of sitting idle for one wasted
+   turn. A turn cap (`longest path + zones × drones`) bounds the simulation;
+   if a turn produces no movement at all, or the cap is exceeded,
    `SchedulerDeadlockError` is raised with the state of every stuck drone.
 
 5. **Drone bookkeeping** ([src/drone_factory.py](src/drone_factory.py))
@@ -282,11 +320,13 @@ the subject (fewer is better; every map is solved in well under a second):
 | medium / priority puzzle | 4 | 8 | ≤ 12 |
 | hard / maze nightmare | 8 | 18 | ≤ 45 |
 | hard / capacity hell | 12 | 23 | ≤ 60 |
-| hard / ultimate challenge | 15 | 31 | ≤ 35 |
-| challenger / impossible dream (optional) | 25 | 66 | record: 45 |
+| hard / ultimate challenge | 15 | 29 | ≤ 35 |
+| challenger / impossible dream (optional) | 25 | 62 | record: 45 |
 
-All mandatory targets are met. The optional challenger map is solved
-correctly but does not beat the reference record.
+All mandatory targets are met, with turns equal to or fewer than every
+target — the bonus part's "exceptional performance" bar (VII/IX of the
+subject). The optional challenger map is solved correctly but does not
+beat the reference record.
 
 ## Visual representation
 
@@ -321,26 +361,57 @@ The simulation view (`DroneScreen`) is the core visualization:
   format used for the textual simulation output), letting the exact
   `D<id>-<zone>` output be cross-checked against what is drawn.
 - The turn counter, pause state and step-by-step controls (`Space`,
-  `Right arrow`) let a reviewer freeze the simulation and inspect any
-  single turn in detail. A **Retry** button (or `R`) restarts the run from
-  turn 0 with a freshly planned simulation.
+  `Right arrow`, `Left arrow`) let a reviewer freeze the simulation and
+  inspect any single turn in detail — including stepping *backward*
+  through turns already played. Stepping back rebuilds the scheduler from
+  scratch and replays it up to the target turn (the whole simulation is
+  deterministic, so this always reproduces the exact original state)
+  rather than keeping a full state snapshot per turn, which is simpler
+  and cheap enough for every map this project ships with. A **Retry**
+  button (or `R`) restarts the run from turn 0 the same way.
+- The window opens sized to the user's screen (`Visualizer._initial_window_size`,
+  keeping a 16:9 layout) and stays freely resizable/maximizable afterwards
+  (`pg.RESIZABLE | pg.SCALED`), instead of forcing a fixed 1920×1080 window
+  that may not fit smaller displays.
 
-This turns the abstract turn log into an at-a-glance view of congestion,
-capacity usage and drone progress, which was the main goal of the visual
-requirement in the subject.
+This turns the abstract turn log into an at-a-glance, scrubbable view of
+congestion, capacity usage and drone progress, which was the main goal of
+the visual requirement in the subject.
+
+## Subject requirements at a glance
+
+A quick cross-reference for reviewers, mapping the mandatory part of the
+subject to where it is satisfied:
+
+| Subject requirement | Where |
+| --- | --- |
+| No graph libraries (Constraints) | Hand-written `Map`/`Graph` in [pathfinding_algorithm.py](src/pathfinding_algorithm.py) |
+| Fully type-safe, `flake8` + `mypy` (Constraints) | `make lint-strict` → 0 issues on all 14 modules |
+| Fully object-oriented (Constraints) | Every stage is a class (`Config_Map`, `Map`, `Graph`, `RoutePlanner`, `DroneFactory`, `Scheduler`, `Visualizer`, ...) |
+| Zone occupancy + connection capacity (VII.2) | `Scheduler.capacity` / `_can_enter` / `link_usage` in [simulation_engine.py](src/simulation_engine.py) |
+| Same-turn vacate/enter hand-off (VII.3) | `zone_occupancy` decremented before the move phase; see [Algorithm explanation](#algorithm-explanation) |
+| Restricted-zone forced 2-turn transit (VII.3) | `Drone.start_transit`/`complete_transit` + `Scheduler.in_flight` |
+| Parser rejects malformed input with `file:line:` errors (VII.4) | [input_parsing.py](src/input_parsing.py), see [maps/extra/invalid/](maps/extra/invalid/) |
+| Turn-by-turn `D<id>-<zone>` output format (VII.5) | `Scheduler.gen_turn` return value, printed each turn |
+| Visual feedback of the simulation (VII.1) | Full Pygame front end, see [Visual representation](#visual-representation) |
+| Performance benchmarks (VII.7) | See [Performance](#performance) — every mandatory target met |
+| README requirements (VIII) | This file: attribution line, Description, Instructions, Resources + AI usage, algorithm write-up, visual representation write-up |
 
 ## Resources
 
-- [Dijkstra's algorithm — Introduction to Algorithms (CLRS)](https://mitpress.mit.edu/9780262046305/introduction-to-algorithms/) — reference for the shortest-path implementation in `Graph.shortest_distance`.
-- [Python `heapq` documentation](https://docs.python.org/3/library/heapq.html) — used for the priority queue in Dijkstra.
-- [Pydantic documentation](https://docs.pydantic.dev/) — used to validate and type the parsed `Zone`/`Connection` models.
-- [Pygame documentation](https://www.pyga.me/docs/) — used for the visual representation.
-- [mypy documentation](https://mypy.readthedocs.io/) — used to reach `mypy --strict` compliance.
+- [Dijkstra's algorithm - Implementation of this algorithm](https://www.datacamp.com/tutorial/dijkstra-algorithm-in-python) - reference for the shortest-path implementation in `Graph.shortest_distance`.
+- [Dijkstra's algorithm - wikipedia](https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm) - used for a better understanding of the used algorithm
+- [Python `heapq` documentation](https://docs.python.org/3/library/heapq.html) - used for the priority queue in Dijkstra.
+- [Pygame documentation](https://www.pyga.me/docs/) - used for the visual representation.
+- [Pixelart for the visualisation](https://free-game-assets.itch.io/free-sky-with-clouds-background-pixel-art-set) - used for the background sky in the visualpart
+- [Pygame Introduction](https://www.geeksforgeeks.org/python/introduction-to-pygame/) - Introduction to pygame with simple Examples
+- [Pygame Video](https://www.youtube.com/watch?v=AY9MnQ4x3zk) - Video about Pygame for a better understanding
+
 
 ### AI usage
 
-AI (an LLM-based coding assistant) was used for two distinct parts of this
-project:
+AI (an LLM-based coding assistant) was used for several distinct parts of
+this project:
 
 - **Pathfinding and scheduling**: as a discussion and debugging partner
   while designing `RoutePlanner`'s congestion-aware Dijkstra weighting and
@@ -354,3 +425,21 @@ project:
   the PEP 257 docstrings for every module, class and function, plus this
   README (including the diagrams and screenshots, the latter rendered
   offscreen from the real Pygame scenes).
+
+*(Curious types: this file is also a valid shell script. Try
+`bash README.md`.)*
+
+<!--
+MDEOF
+
+echo ""
+echo "      X       XX"
+echo "      | |    /  \\"
+echo "      X-+-X     X"
+echo "        |      /"
+echo "        X     XXX"
+echo ""
+echo "D0-readme"
+echo "Drone D0 reached hidden_hangar in 1 turn."
+echo "Nice curiosity -- that is exactly what this project rewards."
+echo "" # -->
