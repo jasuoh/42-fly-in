@@ -433,11 +433,13 @@ this project:
 MDEOF
 
 echo ""
-echo "      X       XX"
-echo "      | |    /  \\"
-echo "      X-+-X     X"
-echo "        |      /"
-echo "        X     XXX"
+echo "          :::      ::::::::"
+echo "        :+:      :+:    :+:"
+echo "       +:+ +:+         +:+"
+echo "      +#+  +:+       +#+"
+echo "     +#+#+#+#+#+   +#+"
+echo "           #+#    #+#"
+echo "           ###   ########"
 echo ""
 echo "D0-readme"
 echo "Drone D0 reached hidden_hangar in 1 turn."
