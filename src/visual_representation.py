@@ -182,7 +182,8 @@ class DroneScreen(BaseScene):
         screen_width: int,
         screen_height: int,
         dronesystem: Drone_System,
-        turn_interval: float = 2
+        wait_time: float = 0.7,
+        move_duration: float = 2
     ) -> None:
         """Create the simulation view for a fully built scheduler.
 
@@ -197,12 +198,16 @@ class DroneScreen(BaseScene):
             screen_width: Width of the drawing surface in pixels.
             screen_height: Height of the drawing surface in pixels.
             dronesystem: Shared animated drone sprite.
-            turn_interval: Seconds of animation between two turns.
+            wait_time: Seconds the drones wait in their zones before
+                the next turn; adjustable with the Up/Down arrows.
+            move_duration: Seconds the flight animation of one turn
+                takes.
         """
         super().__init__(background, particles)
         self.font = font
         self.scheduler = scheduler
-        self.turn_interval = turn_interval
+        self.wait_time = wait_time
+        self.move_duration = move_duration
         self._elapsed = 0.0
         self._finished = False
         self.margin_x: int | None = None
@@ -393,13 +398,11 @@ class DroneScreen(BaseScene):
     def handle_event(self, event: pg.event.Event) -> None:
         """Handle turn stepping, pause toggling and returning to the menu."""
         if event.type == pg.KEYDOWN and event.key == pg.K_RIGHT:
-            if self.pause:
-                self._step_forward()
-                self._elapsed = self.turn_interval
+            self._step_forward()
+            self._reset_turn_timer()
         elif event.type == pg.KEYDOWN and event.key == pg.K_LEFT:
-            if self.pause:
-                self._step_backward()
-                self._elapsed = self.turn_interval
+            self._step_backward()
+            self._reset_turn_timer()
         elif event.type == pg.KEYDOWN:
             if event.key == pg.K_SPACE:
                 self.pause = not self.pause
@@ -412,6 +415,15 @@ class DroneScreen(BaseScene):
         elif event.type == pg.MOUSEBUTTONDOWN:
             if self._retry_rect.collidepoint(event.pos):
                 self._retry()
+
+    def _reset_turn_timer(self) -> None:
+        """Restart the autoplay timer after a manual step.
+
+        While paused the timer does not run, so the drones are snapped
+        to their new zones; otherwise the flight is animated and the
+        drones then wait ``wait_time`` before the next turn.
+        """
+        self._elapsed = self.move_duration if self.pause else 0.0
 
     def _retry(self) -> None:
         """Restart the simulation from turn 0 with a fresh scheduler."""
@@ -477,7 +489,7 @@ class DroneScreen(BaseScene):
         self._elapsed += dt
         if self._finished:
             return
-        if self._elapsed < self.turn_interval:
+        if self._elapsed < self.move_duration + self.wait_time:
             return
         self._elapsed = 0.0
         self._step_forward()
@@ -512,7 +524,7 @@ class DroneScreen(BaseScene):
         if target is None:
             return self._final_zone_pos(drone)
         origin = self._prev_positions.get(drone.drone_id, target)
-        progress = min(1.0, self._elapsed / self.turn_interval)
+        progress = min(1.0, self._elapsed / self.move_duration)
         return (
             origin[0] + (target[0] - origin[0]) * progress,
             origin[1] + (target[1] - origin[1]) * progress,
@@ -665,7 +677,7 @@ class MapSelection(BaseScene):
 
     def update_content(self, dt: float) -> None:
         """The map selection screen has no time-based state to update."""
-        ...
+        pass
 
     def draw_content(self, surface: pg.Surface) -> None:
         """Draw every map entry, highlighting the targeted one."""
