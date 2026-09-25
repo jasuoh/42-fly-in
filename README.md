@@ -113,13 +113,17 @@ The project uses [uv](https://docs.astral.sh/uv/) to manage its virtual
 environment and dependencies, and exposes everything through the `Makefile`:
 
 ```sh
-make install      # uv sync — create the venv and install dependencies
-make run           # uv run python -m src
-make debug         # run the main script under pdb
+make               # show all targets (help)
+make install       # uv sync — create the venv and install dependencies
+make run           # start the simulation (interactive menu)
+make run MAP=...   # start directly with a map file
+make debug         # run the main script under pdb (MAP=... optional)
+make maps          # list all available maps
 make clean         # remove __pycache__ and .mypy_cache
 make fclean        # clean + remove the virtual environment
-make lint          # flake8 . && mypy . <required flags>
-make lint-strict    # flake8 . && mypy . --strict
+make re            # fclean + install
+make lint          # flake8 + mypy
+make lint-strict   # flake8 + mypy --strict
 ```
 
 Running `make run` without any flags opens the interactive Pygame menu,
@@ -127,7 +131,7 @@ where a map can be chosen from the list. A specific map can also be loaded
 directly on the command line:
 
 ```sh
-uv run python -m src --map ./maps/easy/01_linear_path.txt
+make run MAP=maps/easy/01_linear_path.txt
 ```
 
 The window opens sized to fit your screen (85% of the desktop resolution,
