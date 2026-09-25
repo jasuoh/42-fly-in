@@ -1,20 +1,27 @@
 [project]
 name = "42-Fly-In"
 version = "0.1.0"
-description = "Fly-In-Project of jawosylu   "
+description = "Fly-In-Project of jawosylu"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "flake8>=7.3.0",
-    "flake8-pyproject>=1.2.4",
-    "mypy>=2.3.0",
     "pydantic>=2.13.4",
     "pygame-ce>=2.5.8",
-    "rich>=15.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "flake8>=7.4.1",
+    "mypy>=2.3.1",
 ]
 
 [tool.flake8]
 exclude = [".venv", ".git", "__pycache__", ".mypy_cache", "fly-in-tests"]
 
 [tool.mypy]
-exclude = ["fly-in-tests/"]
+exclude = ["fly-in-tests/", ".venv"]
+warn_return_any = true
+warn_unused_ignores = true
+ignore_missing_imports = true
+disallow_untyped_defs = true
+check_untyped_defs = true
