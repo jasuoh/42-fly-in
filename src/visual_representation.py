@@ -584,7 +584,7 @@ class DroneScreen(BaseScene):
             surface.blit(label, label_rect)
         for (zone_a, zone_b), cap in self._link_capacities.items():
             (x, y) = self._connection_midpoints[(zone_a, zone_b)]
-            usage = self.scheduler.link_usage_in_flight(zone_a, zone_b)
+            usage = self.scheduler.link_usage(zone_a, zone_b)
             label = self.font.render(
                 f"{usage}/{cap}", True, 'White'
             )

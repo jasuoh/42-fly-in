@@ -112,6 +112,7 @@ class Scheduler():
             name: 0 for name in self.zone_dict
         }
         self.in_flight: dict[int, tuple[LinkKey, str, int]] = {}
+        self.last_link_usage: dict[LinkKey, int] = {}
         self._turn_cap: int = self._compute_turn_cap()
         self._fairness_threshold: int = max(1, len(self.drone_list))
 
@@ -146,13 +147,13 @@ class Scheduler():
         reserved = self.zone_reserved.get(zone_name, 0)
         return occupied + reserved < capacity
 
-    def link_usage_in_flight(self, zone_a: str, zone_b: str) -> int:
-        """Return how many drones are currently transiting this link."""
-        count: int = 0
-        for link, _, _ in self.in_flight.values():
-            if link == frozenset({zone_a, zone_b}):
-                count += 1
-        return count
+    def link_usage(self, zone_a: str, zone_b: str) -> int:
+        """Return how many drones used this link during the last turn.
+
+        Counts both drones that crossed the link this turn and drones
+        still in transit on it towards a restricted zone.
+        """
+        return self.last_link_usage.get(frozenset({zone_a, zone_b}), 0)
 
     def gen_turn(self) -> str:
         """Advance the simulation by one turn.
@@ -208,6 +209,7 @@ class Scheduler():
             pending = blocked
         for drone in pending:
             drone.mark_blocked()
+        self.last_link_usage = link_usage
         return " ".join(moves)
 
     def _try_move(
